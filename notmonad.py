@@ -80,24 +80,14 @@ def monad(value, _monad):
     return partial(_monad, value)
 
 
-def chain(value):
-    return monad(value, Just)
-
-
 #########################################
-# PREBUILD MONADS
+# BASE MONADS
 #########################################
 
 
 @caller
 def just(value, func, *args, **kwargs):
     return func(value, *args, **kwargs), func, args, kwargs
-
-
-def Just(value, func=None, *args, **kwargs):
-    if func is None and not args and not kwargs:
-        return value
-    return partial(Just, func(value, *args, **kwargs))
 
 
 @caller
@@ -111,18 +101,6 @@ def maybe(value, func=None, *args, **kwargs):
         result = None
 
     return result, func, args, kwargs
-
-
-def Maybe(value, func=None, *args, **kwargs):
-    if func is None and not args and not kwargs:
-        return value
-
-    try:
-        result = func(value, *args, **kwargs)
-    except Exception as e:
-        result = None
-
-    return partial(Maybe, result)
 
 
 def shout(value, func, *args, **kwargs):
@@ -152,3 +130,30 @@ def order_args(value, func, *args, **kwargs):
     value, *args = sort_args([value, *args], order)
 
     return value, func, args, kwargs
+
+
+#########################################
+# CONVENIENCE MONADS
+#########################################
+
+
+def Maybe(value, func=None, *args, **kwargs):
+    if func is None and not args and not kwargs:
+        return value
+
+    try:
+        result = func(value, *args, **kwargs)
+    except Exception as e:
+        result = None
+
+    return partial(Maybe, result)
+
+
+def Just(value, func=None, *args, **kwargs):
+    if func is None and not args and not kwargs:
+        return value
+    return partial(Just, func(value, *args, **kwargs))
+
+
+def chain(value):
+    return monad(value, Just)
