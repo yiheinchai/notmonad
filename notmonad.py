@@ -1,3 +1,8 @@
+#########################################
+# MONADS PLATFORM
+#########################################
+
+
 def partial(func, /, *args, **keywords):
     def newfunc(*fargs, **fkeywords):
         newkeywords = {**keywords, **fkeywords}
@@ -26,59 +31,6 @@ def caller(monad):
 
     inner.__name__ = monad.__name__
     return inner
-
-
-@caller
-def just(value, func, *args, **kwargs):
-    return func(value, *args, **kwargs), func, args, kwargs
-
-
-def Just(value, func=None, *args, **kwargs):
-    if func is None and not args and not kwargs:
-        return value
-    return partial(Just, func(value, *args, **kwargs))
-
-
-@caller
-def maybe(value, func=None, *args, **kwargs):
-    if value is None:
-        return None, func, (), {}
-
-    try:
-        result = func(value, *args, **kwargs)
-    except Exception as e:
-        result = None
-
-    return result, func, args, kwargs
-
-
-def shout(value, func, *args, **kwargs):
-    print("I am shouting!", func.__name__)
-    return value, func, args, kwargs
-
-
-def log(value, func, *args, **kwargs):
-    execution_log = kwargs.pop("_log", [])
-    return (
-        value,
-        func,
-        args,
-        {**kwargs, "_log": [*execution_log, getattr(func, "__name__", None)]},
-    )
-
-
-def order_args(value, func, *args, **kwargs):
-    def sort_args(args, order):
-        return tuple([args[index] for index in order])
-
-    order = kwargs.pop("order", None)
-
-    if order is None:
-        return value, func, args, kwargs
-
-    value, *args = sort_args([value, *args], order)
-
-    return value, func, args, kwargs
 
 
 def compose(*monads):
@@ -130,3 +82,73 @@ def monad(value, _monad):
 
 def chain(value):
     return monad(value, Just)
+
+
+#########################################
+# PREBUILD MONADS
+#########################################
+
+
+@caller
+def just(value, func, *args, **kwargs):
+    return func(value, *args, **kwargs), func, args, kwargs
+
+
+def Just(value, func=None, *args, **kwargs):
+    if func is None and not args and not kwargs:
+        return value
+    return partial(Just, func(value, *args, **kwargs))
+
+
+@caller
+def maybe(value, func=None, *args, **kwargs):
+    if value is None:
+        return None, func, (), {}
+
+    try:
+        result = func(value, *args, **kwargs)
+    except Exception as e:
+        result = None
+
+    return result, func, args, kwargs
+
+
+def Maybe(value, func=None, *args, **kwargs):
+    if func is None and not args and not kwargs:
+        return value
+
+    try:
+        result = func(value, *args, **kwargs)
+    except Exception as e:
+        result = None
+
+    return partial(Maybe, result)
+
+
+def shout(value, func, *args, **kwargs):
+    print("I am shouting!", func.__name__)
+    return value, func, args, kwargs
+
+
+def log(value, func, *args, **kwargs):
+    execution_log = kwargs.pop("_log", [])
+    return (
+        value,
+        func,
+        args,
+        {**kwargs, "_log": [*execution_log, getattr(func, "__name__", None)]},
+    )
+
+
+def order_args(value, func, *args, **kwargs):
+    def sort_args(args, order):
+        return tuple([args[index] for index in order])
+
+    order = kwargs.pop("order", None)
+
+    if order is None:
+        return value, func, args, kwargs
+
+    value, *args = sort_args([value, *args], order)
+
+    return value, func, args, kwargs

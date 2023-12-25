@@ -22,6 +22,12 @@ class TestOrderArgsMonad:
 
 
 class TestJustMonad:
+    def test_construction_direct(self):
+        assert monad(5, Just)() == 5
+
+    def test_construction_with_compose(self):
+        assert monad(5, compose(just))() == 5
+
     def test_able_to_chain_methods(self):
         assert monad(5, Just)(add, 1)(lambda x: x + 2)(add, 3)() == 11
 
@@ -31,6 +37,12 @@ class TestJustMonad:
 
 
 class TestMaybeMonad:
+    def test_construction_direct(self):
+        assert monad(5, Maybe)() == 5
+
+    def test_construction_with_compose(self):
+        assert monad(5, compose(maybe))() == 5
+
     def test_able_to_not_error(self):
         assert (
             monad(5, compose(maybe))(add, 1)(lambda x: x / 0)(lambda x: x + 2)(add, 3)()
