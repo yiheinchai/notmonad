@@ -58,6 +58,30 @@ class TestLogMonad:
         ]
 
 
+class TestDebugMonad:
+    def test_able_to_get_debug_trace(self):
+        assert monad(5, compose(debug, maybe))(add, 1)(lambda x: x / 0)(
+            add, 3
+        ).keywords["_debug_trace"] == [
+            {
+                "func": "add",
+                "args": (5, 1),
+                "kwargs": {},
+                "value": 6,
+                "errors": "",
+                "repr": "add(5, 1) -> 6 []",
+            },
+            {
+                "func": "<lambda>",
+                "args": (6,),
+                "kwargs": {},
+                "value": None,
+                "errors": "division by zero",
+                "repr": "<lambda>(6,) -> None [division by zero]",
+            },
+        ]
+
+
 class TestMonadConstruction:
     def test_construct_monads_directly(self):
         assert monad(5, Just)(add, 1)() == 6

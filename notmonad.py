@@ -26,8 +26,8 @@ def caller(monad):
                 f"Cannot compose two caller monads together. {monad.__name__} is the second caller monad used. Please remove this for it to work."
             )
 
-        newVal, newFunc, newArgs, newKwargs = monad(*args, **pkwargs)
-        return newVal, newFunc, newArgs, {**newKwargs, **_kwargs, "_consumed": True}
+        newVal, newFunc, newArgs, newKwargs = monad(*args, **kwargs)
+        return newVal, newFunc, newArgs, {**_kwargs, **newKwargs, "_consumed": True}
 
     inner.__name__ = monad.__name__
     return inner
@@ -87,11 +87,13 @@ def monad(value, _monad):
 
 @caller
 def just(value, func, *args, **kwargs):
+    kwargs = {key: value for key, value in kwargs.items() if not key.startswith("_")}
     return func(value, *args, **kwargs), func, args, kwargs
 
 
 @caller
 def maybe(value, func=None, *args, **kwargs):
+    kwargs = {key: value for key, value in kwargs.items() if not key.startswith("_")}
     if value is None:
         return None, func, (), {}
 
@@ -101,6 +103,32 @@ def maybe(value, func=None, *args, **kwargs):
         result = None
 
     return result, func, args, kwargs
+
+
+def debug(value, func, *args, **kwargs):
+    if value is None:
+        return None, func, args, kwargs
+
+    debug_trace = kwargs.pop("_debug_trace", [])
+
+    errors = ""
+
+    try:
+        result = func(value, *args, **kwargs)
+    except Exception as e:
+        errors = e
+        result = None
+
+    new_trace = {
+        "func": getattr(func, "__name__", ""),
+        "args": (value, *args),
+        "kwargs": kwargs,
+        "value": result,
+        "errors": str(errors),
+        "repr": f"{getattr(func, '__name__', '')}{(value, *args)} -> {result} [{str(errors)}]",
+    }
+
+    return value, func, args, {**kwargs, "_debug_trace": [*debug_trace, new_trace]}
 
 
 def shout(value, func, *args, **kwargs):
@@ -157,3 +185,10 @@ def Just(value, func=None, *args, **kwargs):
 
 def chain(value):
     return monad(value, Just)
+
+
+def add(arg1, arg2):
+    return arg1 + arg2
+
+
+monad(5, compose(debug))(add, 1)(lambda x: x / 0)(add, 3)
