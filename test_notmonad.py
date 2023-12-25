@@ -32,7 +32,10 @@ class TestJustMonad:
 
 class TestMaybeMonad:
     def test_able_to_not_error(self):
-        assert monad(5, compose(maybe))(add, 1)(lambda x: x + 2)(add, 3)() == 11
+        assert (
+            monad(5, compose(maybe))(add, 1)(lambda x: x / 0)(lambda x: x + 2)(add, 3)()
+            is None
+        )
 
 
 class TestLogMonad:
