@@ -26,7 +26,7 @@ def caller(monad):
                 f"Cannot compose two caller monads together. {monad.__name__} is the second caller monad used. Please remove this for it to work."
             )
 
-        newVal, newFunc, newArgs, newKwargs = monad(*args, **kwargs)
+        newVal, newFunc, newArgs, newKwargs = monad(*args, **pkwargs)
         return newVal, newFunc, newArgs, {**_kwargs, **newKwargs, "_consumed": True}
 
     inner.__name__ = monad.__name__
@@ -87,13 +87,11 @@ def monad(value, _monad):
 
 @caller
 def just(value, func, *args, **kwargs):
-    kwargs = {key: value for key, value in kwargs.items() if not key.startswith("_")}
     return func(value, *args, **kwargs), func, args, kwargs
 
 
 @caller
 def maybe(value, func=None, *args, **kwargs):
-    kwargs = {key: value for key, value in kwargs.items() if not key.startswith("_")}
     if value is None:
         return None, func, (), {}
 
