@@ -59,6 +59,11 @@ class TestLogMonad:
 
 
 class TestDebugMonad:
+    def test_return_none_on_error(self):
+        assert (
+            monad(5, compose(debug, maybe))(add, 1)(lambda x: x / 0)(add, 3)() is None
+        )
+
     def test_able_to_get_debug_trace(self):
         assert monad(5, compose(debug, maybe))(add, 1)(lambda x: x / 0)(
             add, 3
