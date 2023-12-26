@@ -183,10 +183,3 @@ def Just(value, func=None, *args, **kwargs):
 
 def chain(value):
     return monad(value, Just)
-
-
-def add(arg1, arg2):
-    return arg1 + arg2
-
-
-monad(5, compose(debug))(add, 1)(lambda x: x / 0)(add, 3)
