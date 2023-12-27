@@ -158,6 +158,33 @@ def order_args(value, func, *args, **kwargs):
     return value, func, args, kwargs
 
 
+def assign_args(value, func, *args, **kwargs):
+    order = kwargs.pop("order", None)
+
+    if order is None:
+        return value, func, args, kwargs
+
+    args = (value, *args)
+
+    # order is in destination: origin format
+    ordered_args = tuple(
+        [
+            args[origin]
+            for dest, origin in order.items()
+            if isinstance(dest, int) and isinstance(origin, int)
+        ]
+    )
+    ordered_kwargs = {
+        dest: args[origin]
+        for dest, origin in order.items()
+        if isinstance(dest, str) and isinstance(origin, int)
+    }
+
+    value, *args = ordered_args
+
+    return value, func, args, {**kwargs, **ordered_kwargs}
+
+
 #########################################
 # CONVENIENCE MONADS
 #########################################
@@ -183,3 +210,14 @@ def Just(value, func=None, *args, **kwargs):
 
 def chain(value):
     return monad(value, Just)
+
+
+#########################################
+# CONVENIENCE FUNCTIONS
+#########################################
+def loop(data, map=lambda x: x, filter=lambda x: True):
+    return [map(i) for i in data if filter(i)]
+
+
+def call(func, *args, **kwargs):
+    return func(*args, **kwargs)

@@ -99,3 +99,99 @@ class TestMonadConstruction:
 
     def test_construct_monads_with_monads(self):
         assert monad(5, compose(*monad([log], Just)(append, just)()))(add, 1)() == 6
+
+
+class TestLoopFunc:
+    def test_loop_with_filter_transform(self):
+        assert monad([1, 2, 3], Just)(
+            loop, lambda x: [x, x + 1], lambda x: x > 2
+        )() == [[3, 4]]
+
+    def test_loop_no_change(self):
+        assert monad([1, 2, 3], Just)(loop)() == [1, 2, 3]
+
+    def test_loop_nested(self):
+        assert monad([[1, 2, 3], [1, 2, 3], [1, 2, 3]], Just)(
+            loop, lambda x: [i + 1 for i in x]
+        )() == [[2, 3, 4], [2, 3, 4], [2, 3, 4]]
+
+    def test_loop_nested_with_partial(self):
+        assert monad([[1, 2, 3], [1, 2, 3], [1, 2, 3]], Just)(
+            loop, partial(loop, map=lambda x: x + 1)
+        )() == [[2, 3, 4], [2, 3, 4], [2, 3, 4]]
+
+    def test_nested_chain(self):
+        assert monad([[1, 2, 3], [1, 2, 3], [1, 2, 3]], compose(order_args, just))(
+            partial, loop, order=[1, 0]
+        )()(partial(loop, map=lambda x: x + 1)) == [
+            [2, 3, 4],
+            [2, 3, 4],
+            [2, 3, 4],
+        ]
+
+    def test_call_on_nested(self):
+        assert monad([[1, 2, 3], [1, 2, 3], [1, 2, 3]], compose(order_args, just))(
+            partial, loop, order=[1, 0]
+        )(call, partial(loop, map=lambda x: x + 1))() == [
+            [2, 3, 4],
+            [2, 3, 4],
+            [2, 3, 4],
+        ]
+
+    def test_call_on_deeply_nested(self):
+        assert monad(
+            [
+                [[1, 2, 3], [1, 2, 3], [1, 2, 3]],
+                [[1, 2, 3], [1, 2, 3], [1, 2, 3]],
+                [[1, 2, 3], [1, 2, 3], [1, 2, 3]],
+            ],
+            compose(order_args, just),
+        )(partial, loop, order=[1, 0])(
+            call,
+            partial(loop, map=partial(loop, map=lambda x: x + 1)),
+        )() == [
+            [[2, 3, 4], [2, 3, 4], [2, 3, 4]],
+            [[2, 3, 4], [2, 3, 4], [2, 3, 4]],
+            [[2, 3, 4], [2, 3, 4], [2, 3, 4]],
+        ]
+
+    def test_call_on_deeply_nested_monadic(self):
+        assert monad(
+            [
+                [[1, 2, 3]],
+            ],
+            compose(order_args, just),
+        )(partial, loop, order=[1, 0])(
+            call,
+            partial(loop, map=partial(loop, map=lambda x: x + 1)),
+        )() == [
+            [[2, 3, 4]],
+        ]
+
+    def test_call_on_deepest_nested_monadic(self):
+        assert monad(
+            # fmt: skip
+            [[[[1, 2, 3]]]],
+            compose(order_args, just),
+        )(partial, loop, order=[1, 0])(
+            call,
+            partial(
+                loop,
+                map=partial(loop, map=partial(loop, map=lambda x: x + 1)),
+            ),
+        )() == [[[[2, 3, 4]]]]  # fmt: skip
+
+    def test_call_on_deepest_nested_monadic_flat(self):
+        assert monad(
+            [[[[[[1, 2, 3]]]]]],  # fmt: skip
+            compose(order_args, just),
+        )(
+            loop,
+            map=monad(lambda x: x + 1, compose(assign_args, just))(
+                partial, loop, order={0: 1, "map": 0}
+            )(partial, loop, order={0: 1, "map": 0})(
+                partial, loop, order={0: 1, "map": 0}
+            )(partial, loop, order={0: 1, "map": 0})(
+                partial, loop, order={0: 1, "map": 0}
+            )(),
+        )() == [[[[[[2, 3, 4]]]]]]  # fmt: skip
