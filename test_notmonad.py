@@ -140,16 +140,18 @@ class TestLoopFunc:
 
     def test_loop_3_layer_nesting_call_with_nested_lambda(self):
         assert monad(
-            [[[1, 2, 3]]], # fmt: skip
+            [[[1, 2, 3]]],
             compose(order_args, just),
         )(partial, loop, order=[1, 0])(
             call,
             partial(loop, map=partial(loop, map=lambda x: x + 1)),
-        )() == [[[2, 3, 4]]]  # fmt: skip
+        )() == [
+            [[2, 3, 4]]
+        ]
 
     def test_loop_4_layer_nesting_call_with_nested_lambda(self):
         assert monad(
-            [[[[1, 2, 3]]]], # fmt: skip
+            [[[[1, 2, 3]]]],
             compose(order_args, just),
         )(partial, loop, order=[1, 0])(
             call,
@@ -157,19 +159,60 @@ class TestLoopFunc:
                 loop,
                 map=partial(loop, map=partial(loop, map=lambda x: x + 1)),
             ),
-        )() == [[[[2, 3, 4]]]]  # fmt: skip
+        )() == [
+            [[[2, 3, 4]]]
+        ]
 
     def test_loop_4_layer_nesting_call_with_flat_syntax(self):
         assert monad(
-            [[[[[[1, 2, 3]]]]]],  # fmt: skip
-            compose(order_args, just),
+            [[[[[[1, 2, 3]]]]]],
+            Maybe,
         )(
             loop,
             map=monad(lambda x: x + 1, compose(assign_args, just))(
                 partial, loop, order={0: 1, "map": 0}
             )(partial, loop, order={0: 1, "map": 0})(
                 partial, loop, order={0: 1, "map": 0}
-            )(partial, loop, order={0: 1, "map": 0})(
+            )(
+                partial, loop, order={0: 1, "map": 0}
+            )(
                 partial, loop, order={0: 1, "map": 0}
             )(),
-        )() == [[[[[[2, 3, 4]]]]]]  # fmt: skip
+        )() == [[[[[[2, 3, 4]]]]]]
+
+    def test_loop_4_layer_nesting_with_swaps_and_flat_syntax(self):
+        assert monad(
+            [[[[[[1, 2, 3]]]]]],
+            Maybe,
+        )(
+            loop,
+            map=monad(lambda x: x + 1, compose(swap_val, just))(
+                partial, loop, v_key="map"
+            )(partial, loop, v_key="map")(partial, loop, v_key="map")(
+                partial, loop, v_key="map"
+            )(
+                partial, loop, v_key="map"
+            )(),
+        )() == [[[[[[2, 3, 4]]]]]]
+
+    def test_loop_4_layer_nesting_with_auto_swaps_and_flat_syntax(self):
+        assert monad(
+            [[[[[[1, 2, 3]]]]]],
+            Maybe,
+        )(
+            loop,
+            map=monad(lambda x: x + 1, compose(swap_val_auto("map"), just))(
+                partial, loop
+            )(partial, loop)(partial, loop)(partial, loop)(partial, loop)(),
+        )() == [[[[[[2, 3, 4]]]]]]
+
+    def test_dloop_4_layer_nesting_with_auto_swaps_and_flat_syntax(self):
+        assert monad(
+            [[[[[[1, 2, 3]]]]]],
+            Maybe,
+        )(
+            loop,
+            map=monad(lambda x: x + 1, compose(swap_val_auto("map"), just))(dloop)(
+                dloop
+            )(dloop)(dloop)(dloop)(),
+        )() == [[[[[[2, 3, 4]]]]]]

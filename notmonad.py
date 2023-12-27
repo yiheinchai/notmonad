@@ -91,6 +91,11 @@ def just(value, func, *args, **kwargs):
 
 
 @caller
+def just_allow_empty(value, func, *args, **kwargs):
+    return func(*args, **kwargs), func, args, kwargs
+
+
+@caller
 def maybe(value, func=None, *args, **kwargs):
     if value is None:
         return None, func, (), {}
@@ -185,6 +190,43 @@ def assign_args(value, func, *args, **kwargs):
     return value, func, args, {**kwargs, **ordered_kwargs}
 
 
+def swap_val(value, func, *args, **kwargs):
+    v_key = kwargs.pop("v_key", None)
+
+    if v_key is None:
+        return value, func, args, kwargs
+
+    val_temp = value
+
+    try:
+        value = args[0]
+    except IndexError as e:
+        raise IndexError(
+            "To swap out the value to a kwarg, there must at least one arg to replace it."
+        ) from e
+
+    return value, func, args[1:], {**kwargs, v_key: val_temp}
+
+
+def swap_val_auto(v_key):
+    def _swap_val(value, func, *args, **kwargs):
+        if v_key is None:
+            return value, func, args, kwargs
+
+        val_temp = value
+
+        try:
+            value = args[0]
+        except IndexError as e:
+            raise IndexError(
+                "To swap out the value to a kwarg, there must at least one arg to replace it."
+            ) from e
+
+        return value, func, args[1:], {**kwargs, v_key: val_temp}
+
+    return _swap_val
+
+
 #########################################
 # CONVENIENCE MONADS
 #########################################
@@ -217,6 +259,10 @@ def chain(value):
 #########################################
 def loop(data, map=lambda x: x, filter=lambda x: True):
     return [map(i) for i in data if filter(i)]
+
+
+def dloop(*args, **kwargs):
+    return partial(loop, *args, **kwargs)
 
 
 def call(func, *args, **kwargs):
