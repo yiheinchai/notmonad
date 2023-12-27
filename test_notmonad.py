@@ -110,17 +110,17 @@ class TestLoopFunc:
     def test_loop_no_change(self):
         assert monad([1, 2, 3], Just)(loop)() == [1, 2, 3]
 
-    def test_loop_nested(self):
+    def test_loop_2_layer_nesting_lambda(self):
         assert monad([[1, 2, 3], [1, 2, 3], [1, 2, 3]], Just)(
             loop, lambda x: [i + 1 for i in x]
         )() == [[2, 3, 4], [2, 3, 4], [2, 3, 4]]
 
-    def test_loop_nested_with_partial(self):
+    def test_loop_2_layer_nesting_partial(self):
         assert monad([[1, 2, 3], [1, 2, 3], [1, 2, 3]], Just)(
             loop, partial(loop, map=lambda x: x + 1)
         )() == [[2, 3, 4], [2, 3, 4], [2, 3, 4]]
 
-    def test_nested_chain(self):
+    def test_loop_2_layer_nesting_return_then_call(self):
         assert monad([[1, 2, 3], [1, 2, 3], [1, 2, 3]], compose(order_args, just))(
             partial, loop, order=[1, 0]
         )()(partial(loop, map=lambda x: x + 1)) == [
@@ -129,7 +129,7 @@ class TestLoopFunc:
             [2, 3, 4],
         ]
 
-    def test_call_on_nested(self):
+    def test_loop_2_layer_nesting_call_in_monad(self):
         assert monad([[1, 2, 3], [1, 2, 3], [1, 2, 3]], compose(order_args, just))(
             partial, loop, order=[1, 0]
         )(call, partial(loop, map=lambda x: x + 1))() == [
@@ -138,40 +138,18 @@ class TestLoopFunc:
             [2, 3, 4],
         ]
 
-    def test_call_on_deeply_nested(self):
+    def test_loop_3_layer_nesting_call_with_nested_lambda(self):
         assert monad(
-            [
-                [[1, 2, 3], [1, 2, 3], [1, 2, 3]],
-                [[1, 2, 3], [1, 2, 3], [1, 2, 3]],
-                [[1, 2, 3], [1, 2, 3], [1, 2, 3]],
-            ],
+            [[[1, 2, 3]]], # fmt: skip
             compose(order_args, just),
         )(partial, loop, order=[1, 0])(
             call,
             partial(loop, map=partial(loop, map=lambda x: x + 1)),
-        )() == [
-            [[2, 3, 4], [2, 3, 4], [2, 3, 4]],
-            [[2, 3, 4], [2, 3, 4], [2, 3, 4]],
-            [[2, 3, 4], [2, 3, 4], [2, 3, 4]],
-        ]
+        )() == [[[2, 3, 4]]]  # fmt: skip
 
-    def test_call_on_deeply_nested_monadic(self):
+    def test_loop_4_layer_nesting_call_with_nested_lambda(self):
         assert monad(
-            [
-                [[1, 2, 3]],
-            ],
-            compose(order_args, just),
-        )(partial, loop, order=[1, 0])(
-            call,
-            partial(loop, map=partial(loop, map=lambda x: x + 1)),
-        )() == [
-            [[2, 3, 4]],
-        ]
-
-    def test_call_on_deepest_nested_monadic(self):
-        assert monad(
-            # fmt: skip
-            [[[[1, 2, 3]]]],
+            [[[[1, 2, 3]]]], # fmt: skip
             compose(order_args, just),
         )(partial, loop, order=[1, 0])(
             call,
@@ -181,7 +159,7 @@ class TestLoopFunc:
             ),
         )() == [[[[2, 3, 4]]]]  # fmt: skip
 
-    def test_call_on_deepest_nested_monadic_flat(self):
+    def test_loop_4_layer_nesting_call_with_flat_syntax(self):
         assert monad(
             [[[[[[1, 2, 3]]]]]],  # fmt: skip
             compose(order_args, just),
