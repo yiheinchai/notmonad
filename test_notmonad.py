@@ -229,26 +229,30 @@ class TestLoopFunc:
         )() == [{"cluster": [2, 3]}, {"cluster": [4, 5]}]
 
     def test_loop_with_lambda_mod_direct(self):
-        assert monad(
-            [[[[[[[1, 2], [3, 4]]]]]]],
-            Maybe,
-        )(
-            monad(lambda x: x + 1, compose(swap_val, maybe))(
-                partial, loop, v_key="map"
-            )(pfwrap, lambda x: {"cluster": x}, v_key="wrapper")(
-                partial, loop, v_key="map"
-            )(
-                partial, loop, v_key="map"
-            )(
-                partial, loop, v_key="map"
-            )(
-                partial, loop, v_key="map"
-            )(
-                partial, loop, v_key="map"
-            )(
-                partial, loop, v_key="map"
-            )()
-        )() == [[[[[[{"cluster": [2, 3]}, {"cluster": [4, 5]}]]]]]]
+        test_data = [[[[[[[1, 2], [3, 4]]]]]]]
+        test_answer = [[[[[[{"cluster": [2, 3]}, {"cluster": [4, 5]}]]]]]]
+
+        # fmt: off
+        assert monad(test_data,Maybe)(monad(lambda x: x + 1, compose(swap_val_auto_optional("map")))(
+            ploop)(pfwrap, lambda x: {"cluster": x}, v_key="wrapper"
+            )(ploop)(ploop)(ploop)(ploop)(ploop)(ploop)())() == test_answer
+        # fmt: on
+
+        # VS
+
+        assert [
+            [
+                [
+                    [
+                        [[{"cluster": [o + 1 for o in n]} for n in m] for m in l]
+                        for l in k
+                    ]
+                    for k in j
+                ]
+                for j in i
+            ]
+            for i in test_data
+        ] == test_answer
 
     def test_loop_with_real_world_data(self):
         test_data = [
@@ -285,25 +289,47 @@ class TestLoopFunc:
         ]
 
         # TASK: Return the first 5 numbers of zip code and the first number of each phone
-        # answer = [
-        #     [["00001", "00002", "00003"], ["1", "2"]],
-        #     [["00004", "00005", "00006"], ["3", "4", "5", "6"]],
-        # ]
+        answer = [
+            [["00001", "00002", "00003"], ["1", "2"]],
+            [["00004", "00005", "00006"], ["3", "4", "5", "6"]],
+        ]
 
-        # assert answer == [
-        #     [
-        #         [address["zipcode"][:5] for address in user["addresses"]],
-        #         [phone[0] for phone in user["phones"]],
-        #     ]
-        #     for user in test_data
-        # ]
+        assert answer == [
+            [
+                [address["zipcode"][:5] for address in user["addresses"]],
+                [phone[0] for phone in user["phones"]],
+            ]
+            for user in test_data
+        ]
 
-        assert [["00001", "00002", "00003"], ["00004", "00005", "00006"]] == monad(
-            test_data, Maybe
-        )(
-            monad(lambda address: address["zipcode"][:5], compose(swap_val, maybe))(
-                partial, loop, v_key="map"
-            )(pfwrap, lambda x: x["addresses"], v_key="wrapper")(
-                partial, loop, v_key="map"
+        # VS
+
+        assert (
+            answer
+            == monad(test_data, Maybe)(
+                monad(
+                    lambda user: [
+                        monad(
+                            lambda address: address["zipcode"][:5],
+                            compose(swap_val, maybe),
+                        )(partial, loop, v_key="map")(
+                            partial,
+                            lambda x, wrapper: wrapper(x["addresses"]),
+                            v_key="wrapper",
+                        )()(
+                            user
+                        ),
+                        monad(lambda phone: phone[0], compose(swap_val, maybe))(
+                            partial, loop, v_key="map"
+                        )(
+                            partial,
+                            lambda x, wrapper: wrapper(x["phones"]),
+                            v_key="wrapper",
+                        )()(
+                            user
+                        ),
+                    ],
+                    compose(swap_val, maybe),
+                )(partial, loop, v_key="map")()
             )()
-        )()
+        )

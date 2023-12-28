@@ -202,8 +202,6 @@ def swap_val(value, func, *args, **kwargs):
 
     new_kwargs = {**kwargs, v_key: val_temp}
 
-    print(f"{value=}, {func=}, {args[1:]=}, {new_kwargs=}")
-
     return value, func, args[1:], {**kwargs, v_key: val_temp}
 
 
@@ -214,6 +212,25 @@ def swap_val_auto(v_key):
             return value, func, args, kwargs
 
         kwargs = {**kwargs, v_key: value}
+
+        return func(*args, **kwargs), func, args[1:], kwargs
+
+    return _swap_val
+
+
+def swap_val_auto_optional(v_key_auto):
+    @caller
+    def _swap_val(value, func, *args, **kwargs):
+        v_key = kwargs.pop("v_key", None)
+
+        if v_key is not None:
+            kwargs = {**kwargs, v_key: value}
+            return func(*args, **kwargs), func, args[1:], kwargs
+
+        if v_key_auto is None:
+            return value, func, args, kwargs
+
+        kwargs = {**kwargs, v_key_auto: value}
 
         return func(*args, **kwargs), func, args[1:], kwargs
 
@@ -243,13 +260,15 @@ def Just(value, func=None, *args, **kwargs):
     return partial(Just, func(value, *args, **kwargs))
 
 
+#########################################
+# CONVENIENCE FUNCTIONS
+#########################################
+
+
 def chain(value):
     return monad(value, Just)
 
 
-#########################################
-# CONVENIENCE FUNCTIONS
-#########################################
 def loop(data, map=lambda x: x, filter=lambda x: True):
     return [map(i) for i in data if filter(i)]
 
