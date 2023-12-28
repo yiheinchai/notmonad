@@ -201,18 +201,109 @@ class TestLoopFunc:
             Maybe,
         )(
             loop,
-            map=monad(lambda x: x + 1, compose(swap_val_auto("map"), just))(
+            map=monad(lambda x: x + 1, compose(swap_val_auto("map")))(partial, loop)(
                 partial, loop
-            )(partial, loop)(partial, loop)(partial, loop)(partial, loop)(),
+            )(partial, loop)(partial, loop)(partial, loop)(),
         )() == [[[[[[2, 3, 4]]]]]]
 
-    def test_dloop_4_layer_nesting_with_auto_swaps_and_flat_syntax(self):
+    def test_cloop_4_layer_nesting_with_auto_swaps_and_flat_syntax(self):
         assert monad(
             [[[[[[1, 2, 3]]]]]],
             Maybe,
         )(
             loop,
-            map=monad(lambda x: x + 1, compose(swap_val_auto("map"), just))(dloop)(
-                dloop
-            )(dloop)(dloop)(dloop)(),
+            map=monad(lambda x: x + 1, compose(swap_val_auto("map")))(ploop)(ploop)(
+                ploop
+            )(ploop)(ploop)(),
         )() == [[[[[[2, 3, 4]]]]]]
+
+    def test_cloop_with_lambda_modifications(self):
+        assert monad(
+            [[1, 2], [3, 4]],
+            Maybe,
+        )(
+            loop,
+            map=monad(lambda x: x + 1, compose(swap_val, just))(
+                partial, loop, v_key="map"
+            )(pfwrap, lambda x: {"cluster": x}, v_key="wrapper")(),
+        )() == [{"cluster": [2, 3]}, {"cluster": [4, 5]}]
+
+    def test_loop_with_lambda_mod_direct(self):
+        assert monad(
+            [[[[[[[1, 2], [3, 4]]]]]]],
+            Maybe,
+        )(
+            monad(lambda x: x + 1, compose(swap_val, maybe))(
+                partial, loop, v_key="map"
+            )(pfwrap, lambda x: {"cluster": x}, v_key="wrapper")(
+                partial, loop, v_key="map"
+            )(
+                partial, loop, v_key="map"
+            )(
+                partial, loop, v_key="map"
+            )(
+                partial, loop, v_key="map"
+            )(
+                partial, loop, v_key="map"
+            )(
+                partial, loop, v_key="map"
+            )()
+        )() == [[[[[[{"cluster": [2, 3]}, {"cluster": [4, 5]}]]]]]]
+
+    def test_loop_with_real_world_data(self):
+        test_data = [
+            {
+                "name": "Leanne Graham",
+                "addresses": [
+                    {
+                        "zipcode": "00001-999",
+                    },
+                    {
+                        "zipcode": "00002-999",
+                    },
+                    {
+                        "zipcode": "00003-999",
+                    },
+                ],
+                "phones": ["1-770", "2-770"],
+            },
+            {
+                "name": "Ervin Howell",
+                "addresses": [
+                    {
+                        "zipcode": "00004-999",
+                    },
+                    {
+                        "zipcode": "00005-999",
+                    },
+                    {
+                        "zipcode": "00006-999",
+                    },
+                ],
+                "phones": ["3-770", "4-770", "5-770", "6-770"],
+            },
+        ]
+
+        # TASK: Return the first 5 numbers of zip code and the first number of each phone
+        # answer = [
+        #     [["00001", "00002", "00003"], ["1", "2"]],
+        #     [["00004", "00005", "00006"], ["3", "4", "5", "6"]],
+        # ]
+
+        # assert answer == [
+        #     [
+        #         [address["zipcode"][:5] for address in user["addresses"]],
+        #         [phone[0] for phone in user["phones"]],
+        #     ]
+        #     for user in test_data
+        # ]
+
+        assert [["00001", "00002", "00003"], ["00004", "00005", "00006"]] == monad(
+            test_data, Maybe
+        )(
+            monad(lambda address: address["zipcode"][:5], compose(swap_val, maybe))(
+                partial, loop, v_key="map"
+            )(pfwrap, lambda x: x["addresses"], v_key="wrapper")(
+                partial, loop, v_key="map"
+            )()
+        )()

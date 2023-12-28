@@ -91,11 +91,6 @@ def just(value, func, *args, **kwargs):
 
 
 @caller
-def just_allow_empty(value, func, *args, **kwargs):
-    return func(*args, **kwargs), func, args, kwargs
-
-
-@caller
 def maybe(value, func=None, *args, **kwargs):
     if value is None:
         return None, func, (), {}
@@ -205,24 +200,22 @@ def swap_val(value, func, *args, **kwargs):
             "To swap out the value to a kwarg, there must at least one arg to replace it."
         ) from e
 
+    new_kwargs = {**kwargs, v_key: val_temp}
+
+    print(f"{value=}, {func=}, {args[1:]=}, {new_kwargs=}")
+
     return value, func, args[1:], {**kwargs, v_key: val_temp}
 
 
 def swap_val_auto(v_key):
+    @caller
     def _swap_val(value, func, *args, **kwargs):
         if v_key is None:
             return value, func, args, kwargs
 
-        val_temp = value
+        kwargs = {**kwargs, v_key: value}
 
-        try:
-            value = args[0]
-        except IndexError as e:
-            raise IndexError(
-                "To swap out the value to a kwarg, there must at least one arg to replace it."
-            ) from e
-
-        return value, func, args[1:], {**kwargs, v_key: val_temp}
+        return func(*args, **kwargs), func, args[1:], kwargs
 
     return _swap_val
 
@@ -261,8 +254,18 @@ def loop(data, map=lambda x: x, filter=lambda x: True):
     return [map(i) for i in data if filter(i)]
 
 
-def dloop(*args, **kwargs):
+def ploop(*args, **kwargs):
+    """Partial loop (cloop) to allow for chaining of nested loops together"""
     return partial(loop, *args, **kwargs)
+
+
+def fwrap(func, value, wrapper):
+    return func(wrapper(value))
+
+
+def pfwrap(*args, **kwargs):
+    """Partial funciton wrap to allow for chaining of nested functions"""
+    return partial(fwrap, *args, **kwargs)
 
 
 def call(func, *args, **kwargs):
