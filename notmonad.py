@@ -122,9 +122,11 @@ def debug(value, func, *args, **kwargs):
         "args": (value, *args),
         "kwargs": kwargs,
         "value": result,
-        "errors": str(errors),
-        "repr": f"{getattr(func, '__name__', '')}{(value, *args)} -> {result} [{str(errors)}]",
+        "errors": repr(errors),
+        "repr": f"{getattr(func, '__name__', '')}{(value, *args)} -> {result} [{repr(errors)}]",
     }
+
+    print("\n\n ======== \n", new_trace)
 
     return value, func, args, {**kwargs, "_debug_trace": [*debug_trace, new_trace]}
 
@@ -199,8 +201,6 @@ def swap_val(value, func, *args, **kwargs):
         raise IndexError(
             "To swap out the value to a kwarg, there must at least one arg to replace it."
         ) from e
-
-    new_kwargs = {**kwargs, v_key: val_temp}
 
     return value, func, args[1:], {**kwargs, v_key: val_temp}
 
@@ -278,14 +278,58 @@ def ploop(*args, **kwargs):
     return partial(loop, *args, **kwargs)
 
 
-def fwrap(func, value, wrapper):
+def innerwrap(func, value, wrapper):
     return func(wrapper(value))
 
 
-def pfwrap(*args, **kwargs):
+def pinnerwrap(*args, **kwargs):
     """Partial funciton wrap to allow for chaining of nested functions"""
-    return partial(fwrap, *args, **kwargs)
+    return partial(innerwrap, *args, **kwargs)
+
+
+def outerwrap(func, value, wrapper):
+    return wrapper(func(value))
+
+
+def pouterwrap(*args, **kwargs):
+    """Partial funciton wrap to allow for chaining of nested functions"""
+    return partial(outerwrap, *args, **kwargs)
 
 
 def call(func, *args, **kwargs):
     return func(*args, **kwargs)
+
+
+def join(value, value2):
+    def inner(data):
+        return [value(data), value2(data)]
+
+    return inner
+
+
+def merge(value, value2):
+    def inner(data):
+        return {**value(data), **value2(data)}
+
+    return inner
+
+
+def state(data, func=None, *args, **kwargs):
+    hof, curr_monad = data
+
+    if func is None:
+        return partial(hof, curr_monad())
+
+    if (v_key := kwargs.pop("m_key", None)) is not None:
+        kwargs = {**kwargs, "v_key": v_key}
+    else:
+        args = (curr_monad, *args)
+
+    return [hof, curr_monad(func, *args, **kwargs)]
+
+
+def pmerge(value, func):
+    def inner(value2, data):
+        return {**value(data), **value2(data)}
+
+    return [inner, monad(func, compose(swap_val, maybe))]
