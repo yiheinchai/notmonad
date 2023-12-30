@@ -178,6 +178,17 @@ NotMonad also allows you to create your own custom monads to fit your use case. 
 
 If the function is called to modify the value returned, then it must have the `@caller` decorator.
 
+### Loops and Memory storage
+
+With the introduction of loops and memory storage, you can now write any python application entirely within NotMonad.
+
+Loops can be written inside a lambda function or using the `loop` function. If else statements can be written inside a lambda function.
+
+Now, with the memory storage API, you can post your current calculations into the function's memory, and hop onto a new set of calculations by `__mount` or `__get`, and hence continue calculations from there.
+
+After getting both to the stage where you want to combine both calculations, you can use the `__call` method.
+![image](https://github.com/yiheinchai/notmonad/assets/76833604/8090512b-f05b-492c-9c5f-0c1207303890)
+
 ## API
 
 -   `chain(<val>)(<func>, *params)()`
