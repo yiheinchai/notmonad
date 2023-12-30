@@ -209,7 +209,8 @@ class TestLoopFunc:
         )(
             loop,
             map=monad(lambda x: x + 1, compose(swap_val, just))(ploop)(
-                pinnerwrap, lambda x: {"cluster": x}, v_key="wrapper"
+                wrap,
+                lambda x: {"cluster": x},
             )(),
         )() == [{"cluster": [2, 3]}, {"cluster": [4, 5]}]
 
@@ -219,7 +220,7 @@ class TestLoopFunc:
 
         # fmt: off
         assert monad(test_data,Maybe)(monad(lambda x: x + 1, compose(swap_val, maybe))(
-            ploop)(pinnerwrap, lambda x: {"cluster": x}, v_key="wrapper"
+            ploop)(wrap, lambda x: {"cluster": x}, 
             )(ploop)(ploop)(ploop)(ploop)(ploop)(ploop)())() == test_answer
         # fmt: on
 
@@ -297,17 +298,9 @@ class TestLoopFunc:
                         monad(
                             lambda address: address["zipcode"][:5],
                             compose(swap_val, maybe),
-                        )(ploop)(
-                            partial,
-                            lambda x, wrapper: wrapper(x["addresses"]),
-                            v_key="wrapper",
-                        )()(
-                            user
-                        ),
+                        )(ploop)(peel, lambda x: x["addresses"],)()(user),
                         monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
-                            partial,
-                            lambda x, wrapper: wrapper(x["phones"]),
-                            v_key="wrapper",
+                            peel, lambda x: x["phones"]
                         )()(user),
                     ],
                     compose(swap_val, maybe),
@@ -371,14 +364,11 @@ class TestLoopFunc:
                 monad(
                     lambda address: address["zipcode"][:5],
                     compose(swap_val, maybe),
-                )(ploop)(
-                    partial, lambda x, wrapper: wrapper(x["addresses"]), v_key="wrapper"
-                )(
+                )(ploop)(peel, lambda x: x["addresses"])(
                     join,
                     monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
-                        partial,
-                        lambda x, wrapper: wrapper(x["phones"]),
-                        v_key="wrapper",
+                        peel,
+                        lambda x: x["phones"],
                     )(),
                 )(
                     ploop
@@ -445,15 +435,21 @@ class TestLoopFunc:
                 monad(
                     lambda address: address["zipcode"][:5],
                     compose(swap_val, maybe),
-                )(ploop)(pouterwrap, lambda x: x["addresses"], v_key="wrapper")(
-                    pinnerwrap, lambda x: {"address": x}, v_key="wrapper"
+                )(ploop)(
+                    peel,
+                    lambda x: x["addresses"],
+                )(
+                    wrap,
+                    lambda x: {"address": x},
                 )(
                     merge,
                     monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
-                        pouterwrap,
+                        peel,
                         lambda x: x["phones"],
-                        v_key="wrapper",
-                    )(pinnerwrap, lambda x: {"phone": x}, v_key="wrapper")(),
+                    )(
+                        wrap,
+                        lambda x: {"phone": x},
+                    )(),
                 )(
                     ploop
                 )()
@@ -521,13 +517,13 @@ class TestMem:
                 (__post="data")
                 (__mount=lambda address: address["zipcode"][:5])
                 (ploop)
-                (pouterwrap, lambda x: x["addresses"],v_key="wrapper")
-                (pinnerwrap, lambda x: {"address": x}, v_key="wrapper")
+                (peel,  lambda x: x["addresses"])
+                (wrap, lambda x: {"address": x})
                 (__post="user_func")
                 (__mount=lambda phone: phone[0])
                 (ploop)
-                (pouterwrap, lambda x: x["phones"],v_key="wrapper")
-                (pinnerwrap, lambda x: {"phone": x}, v_key="wrapper")
+                (peel,  lambda x: x["phones"])
+                (wrap, lambda x: {"phone": x})
                 (pmerge)
                 (__get="user_func", __call=True)
                 (ploop)

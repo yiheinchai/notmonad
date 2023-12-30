@@ -317,22 +317,22 @@ def ploop(value, *args, **kwargs):
     return partial(loop, *args, map=value, **kwargs)
 
 
-def innerwrap(func, value, wrapper):
-    return func(wrapper(value))
+def innerwrap(transform, value, pipeline):
+    return transform(pipeline(value))
 
 
-def pinnerwrap(*args, **kwargs):
-    """Partial funciton wrap to allow for chaining of nested functions"""
-    return partial(innerwrap, *args, **kwargs)
+def wrap(pipeline, *args, **kwargs):
+    """Feed data into processing pipeline first, and then wrap it nicely"""
+    return partial(innerwrap, *args, pipeline=pipeline, **kwargs)
 
 
-def outerwrap(func, value, wrapper):
-    return wrapper(func(value))
+def outerwrap(transform, value, pipeline):
+    return pipeline(transform(value))
 
 
-def pouterwrap(*args, **kwargs):
-    """Partial funciton wrap to allow for chaining of nested functions"""
-    return partial(outerwrap, *args, **kwargs)
+def peel(pipeline, *args, **kwargs):
+    """Peel the data first, then feed it in the data processing pipeline"""
+    return partial(outerwrap, *args, pipeline=pipeline, **kwargs)
 
 
 def call(func, *args, **kwargs):
