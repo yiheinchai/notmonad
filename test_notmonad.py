@@ -73,16 +73,16 @@ class TestDebugMonad:
                 "args": (5, 1),
                 "kwargs": {},
                 "value": 6,
-                "errors": "",
-                "repr": "add(5, 1) -> 6 []",
+                "errors": "''",
+                "repr": "add(5, 1) -> 6 ['']",
             },
             {
                 "func": "<lambda>",
                 "args": (6,),
                 "kwargs": {},
                 "value": None,
-                "errors": "division by zero",
-                "repr": "<lambda>(6,) -> None [division by zero]",
+                "errors": "ZeroDivisionError('division by zero')",
+                "repr": "<lambda>(6,) -> None [ZeroDivisionError('division by zero')]",
             },
         ]
 

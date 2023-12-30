@@ -11,6 +11,7 @@ def partial(func, /, *args, **keywords):
     newfunc.func = func
     newfunc.args = args
     newfunc.keywords = keywords
+    newfunc.__name__ = func.__name__
     return newfunc
 
 
@@ -76,8 +77,8 @@ def mmonad(monad_to_add):
     return _monad_monad([], monad_to_add)
 
 
-def monad(value, _monad):
-    return partial(_monad, value)
+def monad(value, monad_func):
+    return partial(monad_func, value)
 
 
 #########################################
@@ -126,7 +127,7 @@ def debug(value, func, *args, **kwargs):
         "repr": f"{getattr(func, '__name__', '')}{(value, *args)} -> {result} [{repr(errors)}]",
     }
 
-    print("\n\n ======== \n", new_trace)
+    print("\n\n ======== \n", new_trace["repr"])
 
     return value, func, args, {**kwargs, "_debug_trace": [*debug_trace, new_trace]}
 
@@ -315,6 +316,9 @@ def merge(value, value2):
 
 
 def state(data, func=None, *args, **kwargs):
+    if not isinstance(data, list):
+        return [data, monad(func, compose(debug, swap_val, maybe))]
+
     hof, curr_monad = data
 
     if func is None:
@@ -332,4 +336,4 @@ def pmerge(value, func):
     def inner(value2, data):
         return {**value(data), **value2(data)}
 
-    return [inner, monad(func, compose(swap_val, maybe))]
+    return [inner, monad(func, compose(debug, swap_val, maybe))]
