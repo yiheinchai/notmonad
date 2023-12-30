@@ -12,6 +12,40 @@ def append(arr, ele):
     return [*arr, ele]
 
 
+json_data = [
+    {
+        "name": "Leanne Graham",
+        "addresses": [
+            {
+                "zipcode": "00001-999",
+            },
+            {
+                "zipcode": "00002-999",
+            },
+            {
+                "zipcode": "00003-999",
+            },
+        ],
+        "phones": ["1-770", "2-770"],
+    },
+    {
+        "name": "Ervin Howell",
+        "addresses": [
+            {
+                "zipcode": "00004-999",
+            },
+            {
+                "zipcode": "00005-999",
+            },
+            {
+                "zipcode": "00006-999",
+            },
+        ],
+        "phones": ["3-770", "4-770", "5-770", "6-770"],
+    },
+]
+
+
 class TestOrderArgsMonad:
     def test_able_to_order_args_for_numpy_funcs(self):
         result = monad(
@@ -219,9 +253,17 @@ class TestLoopFunc:
         test_answer = [[[[[[{"cluster": [2, 3]}, {"cluster": [4, 5]}]]]]]]
 
         # fmt: off
-        assert monad(test_data,Maybe)(monad(lambda x: x + 1, compose(swap_val, maybe))(
-            p_loop)(wrap, lambda x: {"cluster": x}, 
-            )(p_loop)(p_loop)(p_loop)(p_loop)(p_loop)(p_loop)())() == test_answer
+        assert (monad(test_data,Maybe)
+                (monad(lambda x: x + 1, compose(swap_val, maybe))
+                 (p_loop)
+                 (wrap, lambda x: {"cluster": x})
+                 (p_loop)
+                 (p_loop)
+                 (p_loop)
+                 (p_loop)
+                 (p_loop)
+                 (p_loop)
+                 ())() == test_answer)
         # fmt: on
 
         # VS
@@ -240,40 +282,25 @@ class TestLoopFunc:
             for i in test_data
         ] == test_answer
 
-    def test_loop_with_real_world_data(self):
-        test_data = [
-            {
-                "name": "Leanne Graham",
-                "addresses": [
-                    {
-                        "zipcode": "00001-999",
-                    },
-                    {
-                        "zipcode": "00002-999",
-                    },
-                    {
-                        "zipcode": "00003-999",
-                    },
-                ],
-                "phones": ["1-770", "2-770"],
-            },
-            {
-                "name": "Ervin Howell",
-                "addresses": [
-                    {
-                        "zipcode": "00004-999",
-                    },
-                    {
-                        "zipcode": "00005-999",
-                    },
-                    {
-                        "zipcode": "00006-999",
-                    },
-                ],
-                "phones": ["3-770", "4-770", "5-770", "6-770"],
-            },
-        ]
+    def test_loop_with_flatten(self):
+        test_data = [[[[[[[1, 2], [3, 4]]]]]]]
+        test_answer = [{"cluster": [2, 3]}, {"cluster": [4, 5]}]
 
+        # fmt: off
+        assert (monad(test_data,Maybe)
+                (monad(lambda x: x + 1, compose(swap_val, maybe))
+                 (p_loop)
+                 (wrap, lambda x: {"cluster": x})
+                 (p_loop)
+                 (peel, lambda x: x[0])
+                 (peel, lambda x: x[0])
+                 (peel, lambda x: x[0])
+                 (peel, lambda x: x[0])
+                 (peel, lambda x: x[0])
+                 ())()) == test_answer
+        # fmt: on
+
+    def test_loop_with_real_world_data(self):
         # TASK: Return the first 5 numbers of zip code and the first number of each phone
         answer = [
             [["00001", "00002", "00003"], ["1", "2"]],
@@ -285,14 +312,14 @@ class TestLoopFunc:
                 [address["zipcode"][:5] for address in user["addresses"]],
                 [phone[0] for phone in user["phones"]],
             ]
-            for user in test_data
+            for user in json_data
         ]
 
         # VS
 
         assert (
             answer
-            == monad(test_data, Maybe)(
+            == monad(json_data, Maybe)(
                 monad(
                     lambda user: [
                         monad(
@@ -309,39 +336,6 @@ class TestLoopFunc:
         )
 
     def test_loop_with_join_on_real_world_data(self):
-        test_data = [
-            {
-                "name": "Leanne Graham",
-                "addresses": [
-                    {
-                        "zipcode": "00001-999",
-                    },
-                    {
-                        "zipcode": "00002-999",
-                    },
-                    {
-                        "zipcode": "00003-999",
-                    },
-                ],
-                "phones": ["1-770", "2-770"],
-            },
-            {
-                "name": "Ervin Howell",
-                "addresses": [
-                    {
-                        "zipcode": "00004-999",
-                    },
-                    {
-                        "zipcode": "00005-999",
-                    },
-                    {
-                        "zipcode": "00006-999",
-                    },
-                ],
-                "phones": ["3-770", "4-770", "5-770", "6-770"],
-            },
-        ]
-
         # TASK: Return the first 5 numbers of zip code and the first number of each phone
         answer = [
             [["00001", "00002", "00003"], ["1", "2"]],
@@ -353,14 +347,14 @@ class TestLoopFunc:
                 [address["zipcode"][:5] for address in user["addresses"]],
                 [phone[0] for phone in user["phones"]],
             ]
-            for user in test_data
+            for user in json_data
         ]
 
         # VS
 
         assert (
             answer
-            == monad(test_data, Maybe)(
+            == monad(json_data, Maybe)(
                 monad(
                     lambda address: address["zipcode"][:5],
                     compose(swap_val, maybe),
@@ -377,39 +371,6 @@ class TestLoopFunc:
         )
 
     def test_loop_with_merge_on_real_world_data(self):
-        test_data = [
-            {
-                "name": "Leanne Graham",
-                "addresses": [
-                    {
-                        "zipcode": "00001-999",
-                    },
-                    {
-                        "zipcode": "00002-999",
-                    },
-                    {
-                        "zipcode": "00003-999",
-                    },
-                ],
-                "phones": ["1-770", "2-770"],
-            },
-            {
-                "name": "Ervin Howell",
-                "addresses": [
-                    {
-                        "zipcode": "00004-999",
-                    },
-                    {
-                        "zipcode": "00005-999",
-                    },
-                    {
-                        "zipcode": "00006-999",
-                    },
-                ],
-                "phones": ["3-770", "4-770", "5-770", "6-770"],
-            },
-        ]
-
         # TASK: Return the first 5 numbers of zip code and the first number of each phone
         answer = [
             {"address": ["00001", "00002", "00003"], "phone": ["1", "2"]},
@@ -424,14 +385,14 @@ class TestLoopFunc:
                 "address": [address["zipcode"][:5] for address in user["addresses"]],
                 "phone": [phone[0] for phone in user["phones"]],
             }
-            for user in test_data
+            for user in json_data
         ]
 
         # VS
 
         assert (
             answer
-            == monad(test_data, Maybe)(
+            == monad(json_data, Maybe)(
                 monad(
                     lambda address: address["zipcode"][:5],
                     compose(swap_val, maybe),
@@ -459,39 +420,6 @@ class TestLoopFunc:
 
 class TestMem:
     def test_loop_with_mem(self):
-        test_data = [
-            {
-                "name": "Leanne Graham",
-                "addresses": [
-                    {
-                        "zipcode": "00001-999",
-                    },
-                    {
-                        "zipcode": "00002-999",
-                    },
-                    {
-                        "zipcode": "00003-999",
-                    },
-                ],
-                "phones": ["1-770", "2-770"],
-            },
-            {
-                "name": "Ervin Howell",
-                "addresses": [
-                    {
-                        "zipcode": "00004-999",
-                    },
-                    {
-                        "zipcode": "00005-999",
-                    },
-                    {
-                        "zipcode": "00006-999",
-                    },
-                ],
-                "phones": ["3-770", "4-770", "5-770", "6-770"],
-            },
-        ]
-
         # TASK: Return the first 5 numbers of zip code and the first number of each phone
         answer = [
             {"address": ["00001", "00002", "00003"], "phone": ["1", "2"]},
@@ -506,14 +434,14 @@ class TestMem:
                 "address": [address["zipcode"][:5] for address in user["addresses"]],
                 "phone": [phone[0] for phone in user["phones"]],
             }
-            for user in test_data
+            for user in json_data
         ]
 
         # VS
         # fmt: off
         assert (
             answer
-            == monad(test_data, compose(mem, debug, swap_val, maybe))
+            == monad(json_data, compose(mem, debug, swap_val, maybe))
                 (__post="data")
                 (__mount=lambda address: address["zipcode"][:5])
                 (p_loop)
