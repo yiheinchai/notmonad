@@ -351,23 +351,6 @@ def merge(value, value2):
     return inner
 
 
-def state(data, func=None, *args, **kwargs):
-    if not isinstance(data, list):
-        return [data, monad(func, compose(debug, swap_val, maybe))]
-
-    hof, curr_monad = data
-
-    if func is None:
-        return partial(hof, curr_monad())
-
-    if (v_key := kwargs.pop("m_key", None)) is not None:
-        kwargs = {**kwargs, "v_key": v_key}
-    else:
-        args = (curr_monad, *args)
-
-    return [hof, curr_monad(func, *args, **kwargs)]
-
-
 def pmerge(*args):
     return partial(merge, *args)
 
