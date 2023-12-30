@@ -551,7 +551,7 @@ class TestLoopFunc:
                 )(
                     pinnerwrap, lambda x: {"address": x}, v_key="wrapper"
                 )(
-                    pmerge, lambda phone: phone[0]
+                    ppmerge, lambda phone: phone[0]
                 )(
                     state, partial, loop, m_key="map"
                 )(
@@ -568,3 +568,79 @@ class TestLoopFunc:
                 )()
             )()
         )
+
+
+class TestMem:
+    def test_loop_with_mem(self):
+        test_data = [
+            {
+                "name": "Leanne Graham",
+                "addresses": [
+                    {
+                        "zipcode": "00001-999",
+                    },
+                    {
+                        "zipcode": "00002-999",
+                    },
+                    {
+                        "zipcode": "00003-999",
+                    },
+                ],
+                "phones": ["1-770", "2-770"],
+            },
+            {
+                "name": "Ervin Howell",
+                "addresses": [
+                    {
+                        "zipcode": "00004-999",
+                    },
+                    {
+                        "zipcode": "00005-999",
+                    },
+                    {
+                        "zipcode": "00006-999",
+                    },
+                ],
+                "phones": ["3-770", "4-770", "5-770", "6-770"],
+            },
+        ]
+
+        # TASK: Return the first 5 numbers of zip code and the first number of each phone
+        answer = [
+            {"address": ["00001", "00002", "00003"], "phone": ["1", "2"]},
+            {
+                "address": ["00004", "00005", "00006"],
+                "phone": ["3", "4", "5", "6"],
+            },
+        ]
+
+        assert answer == [
+            {
+                "address": [address["zipcode"][:5] for address in user["addresses"]],
+                "phone": [phone[0] for phone in user["phones"]],
+            }
+            for user in test_data
+        ]
+
+        # VS
+        # fmt: off
+        assert (
+            answer
+            == monad(test_data, compose(mem, debug, swap_val, maybe))
+                (__post="data")
+                (__mount=lambda address: address["zipcode"][:5])
+                (partial, loop, v_key="map")
+                (pouterwrap, lambda x: x["addresses"],v_key="wrapper")
+                (pinnerwrap, lambda x: {"address": x}, v_key="wrapper")
+                (__post="user_func")
+                (__mount=lambda phone: phone[0])
+                (partial, loop, v_key="map")
+                (pouterwrap, lambda x: x["phones"],v_key="wrapper")
+                (pinnerwrap, lambda x: {"phone": x}, v_key="wrapper")
+                (pmerge)
+                (__get="user_func", __call=True)
+                (partial, loop, v_key="map")
+                (__get="data", __call=True)
+                ()
+        )
+        # fmt: on

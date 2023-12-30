@@ -39,19 +39,33 @@ def compose(*monads):
         pkwargs = {
             key: value for key, value in kwargs.items() if not key.startswith("_")
         }
+        # TODO: BAD CODE rethink __ as actionable args
+        __kwargs = {key: value for key, value in kwargs.items() if key.startswith("__")}
         _kwargs = {
             key: value
             for key, value in kwargs.items()
-            if key.startswith("_") and not key == "_consumed"
+            if key.startswith("_")
+            # TODO: BAD CODE too many edge case conditions
+            and not key.startswith("__") and not key in ["_consumed", "_skip"]
         }
-        if func is None and not args and not pkwargs:
+        # TODO: BAD CODE too many edge case conditions
+        if func is None and not args and not pkwargs and not __kwargs:
             return value
 
-        if len(_monads) == 0 and func is not None:
+            # TODO: BAD CODE too many edge case conditions
+        if (len(_monads) == 0 and kwargs.get("_skip", False)) or (
+            len(_monads) == 0 and func is not None
+        ):
             return partial(combined_monad, monads, value, **_kwargs)
 
         monad, *rest_monads = _monads
-        newVal, newFunc, newArgs, newKwargs = monad(value, func, *args, **kwargs)
+
+        # enables skipping execution of rest of monads, used by mem
+        if kwargs.get("_skip", False):
+            newVal, newFunc, newArgs, newKwargs = value, func, args, kwargs
+        else:
+            newVal, newFunc, newArgs, newKwargs = monad(value, func, *args, **kwargs)
+
         return combined_monad(rest_monads, newVal, newFunc, *newArgs, **newKwargs)
 
     return partial(combined_monad, monads)
@@ -238,6 +252,43 @@ def swap_val_auto_optional(v_key_auto):
     return _swap_val
 
 
+def mem(value, func, *args, **kwargs):
+    # mem APIs
+    post_key = kwargs.get("__post", None)
+    get_key = kwargs.get("__get", None)
+    should_call = kwargs.get("__call", False)
+    data_to_mount = kwargs.get("__mount", None)
+
+    kwargs_mem: dict = kwargs.get("_mem", {})
+
+    if post_key is not None:
+        newMem = {**kwargs_mem, post_key: value}
+
+        if get_key is None:
+            newValue = None
+
+        if data_to_mount is not None:
+            newValue = data_to_mount
+
+        return newValue, func, args, {**kwargs, "_mem": newMem, "_skip": True}
+
+    if get_key is not None:
+        # throw old value away. need to store in mem before to not lose it
+        newValue = kwargs_mem.pop(get_key, None)
+
+        if should_call:
+            # TODO: DO NOT CALL, return a partial to be called instead
+            newValue = value(newValue)
+
+        return newValue, func, args, {**kwargs, "_mem": kwargs_mem, "_skip": True}
+
+    if data_to_mount is not None:
+        newValue = data_to_mount
+        return newValue, func, args, {**kwargs, "_skip": True}
+
+    return value, func, args, {**kwargs, "_skip": False}
+
+
 #########################################
 # CONVENIENCE MONADS
 #########################################
@@ -317,7 +368,11 @@ def state(data, func=None, *args, **kwargs):
     return [hof, curr_monad(func, *args, **kwargs)]
 
 
-def pmerge(value, func):
+def pmerge(*args):
+    return partial(merge, *args)
+
+
+def ppmerge(value, func):
     def inner(value2, data):
         return {**value(data), **value2(data)}
 
