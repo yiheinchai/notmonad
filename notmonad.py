@@ -241,24 +241,9 @@ def swap_val_auto_optional(v_key_auto):
 #########################################
 # CONVENIENCE MONADS
 #########################################
-
-
-def Maybe(value, func=None, *args, **kwargs):
-    if func is None and not args and not kwargs:
-        return value
-
-    try:
-        result = func(value, *args, **kwargs)
-    except Exception as e:
-        result = None
-
-    return partial(Maybe, result)
-
-
-def Just(value, func=None, *args, **kwargs):
-    if func is None and not args and not kwargs:
-        return value
-    return partial(Just, func(value, *args, **kwargs))
+Maybe = compose(maybe)
+Just = compose(just)
+ForLoops = compose(debug, swap_val, maybe)
 
 
 #########################################
