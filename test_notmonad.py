@@ -186,35 +186,20 @@ class TestLoopFunc:
             Maybe,
         )(
             loop,
-            map=monad(lambda x: x + 1, compose(swap_val, just))(
-                partial, loop, v_key="map"
-            )(partial, loop, v_key="map")(partial, loop, v_key="map")(
-                partial, loop, v_key="map"
-            )(
-                partial, loop, v_key="map"
-            )(),
-        )() == [[[[[[2, 3, 4]]]]]]
-
-    def test_loop_4_layer_nesting_with_auto_swaps_and_flat_syntax(self):
-        assert monad(
-            [[[[[[1, 2, 3]]]]]],
-            Maybe,
-        )(
-            loop,
-            map=monad(lambda x: x + 1, compose(swap_val_auto("map")))(partial, loop)(
-                partial, loop
-            )(partial, loop)(partial, loop)(partial, loop)(),
-        )() == [[[[[[2, 3, 4]]]]]]
-
-    def test_cloop_4_layer_nesting_with_auto_swaps_and_flat_syntax(self):
-        assert monad(
-            [[[[[[1, 2, 3]]]]]],
-            Maybe,
-        )(
-            loop,
-            map=monad(lambda x: x + 1, compose(swap_val_auto("map")))(ploop)(ploop)(
+            map=monad(lambda x: x + 1, compose(swap_val, just))(ploop)(ploop)(ploop)(
                 ploop
-            )(ploop)(ploop)(),
+            )(ploop)(),
+        )() == [[[[[[2, 3, 4]]]]]]
+
+    def test_cloop_4_layer_nesting_with_flat_syntax(self):
+        assert monad(
+            [[[[[[1, 2, 3]]]]]],
+            Maybe,
+        )(
+            loop,
+            map=monad(lambda x: x + 1, compose(swap_val, maybe))(ploop)(ploop)(ploop)(
+                ploop
+            )(ploop)(),
         )() == [[[[[[2, 3, 4]]]]]]
 
     def test_cloop_with_lambda_modifications(self):
@@ -223,9 +208,9 @@ class TestLoopFunc:
             Maybe,
         )(
             loop,
-            map=monad(lambda x: x + 1, compose(swap_val, just))(
-                partial, loop, v_key="map"
-            )(pinnerwrap, lambda x: {"cluster": x}, v_key="wrapper")(),
+            map=monad(lambda x: x + 1, compose(swap_val, just))(ploop)(
+                pinnerwrap, lambda x: {"cluster": x}, v_key="wrapper"
+            )(),
         )() == [{"cluster": [2, 3]}, {"cluster": [4, 5]}]
 
     def test_loop_with_lambda_mod_direct(self):
@@ -233,7 +218,7 @@ class TestLoopFunc:
         test_answer = [[[[[[{"cluster": [2, 3]}, {"cluster": [4, 5]}]]]]]]
 
         # fmt: off
-        assert monad(test_data,Maybe)(monad(lambda x: x + 1, compose(swap_val_auto_optional("map")))(
+        assert monad(test_data,Maybe)(monad(lambda x: x + 1, compose(swap_val, maybe))(
             ploop)(pinnerwrap, lambda x: {"cluster": x}, v_key="wrapper"
             )(ploop)(ploop)(ploop)(ploop)(ploop)(ploop)())() == test_answer
         # fmt: on
@@ -312,25 +297,21 @@ class TestLoopFunc:
                         monad(
                             lambda address: address["zipcode"][:5],
                             compose(swap_val, maybe),
-                        )(partial, loop, v_key="map")(
+                        )(ploop)(
                             partial,
                             lambda x, wrapper: wrapper(x["addresses"]),
                             v_key="wrapper",
                         )()(
                             user
                         ),
-                        monad(lambda phone: phone[0], compose(swap_val, maybe))(
-                            partial, loop, v_key="map"
-                        )(
+                        monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
                             partial,
                             lambda x, wrapper: wrapper(x["phones"]),
                             v_key="wrapper",
-                        )()(
-                            user
-                        ),
+                        )()(user),
                     ],
                     compose(swap_val, maybe),
-                )(partial, loop, v_key="map")()
+                )(ploop)()
             )()
         )
 
@@ -390,19 +371,17 @@ class TestLoopFunc:
                 monad(
                     lambda address: address["zipcode"][:5],
                     compose(swap_val, maybe),
-                )(partial, loop, v_key="map")(
+                )(ploop)(
                     partial, lambda x, wrapper: wrapper(x["addresses"]), v_key="wrapper"
                 )(
                     join,
-                    monad(lambda phone: phone[0], compose(swap_val, maybe))(
-                        partial, loop, v_key="map"
-                    )(
+                    monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
                         partial,
                         lambda x, wrapper: wrapper(x["phones"]),
                         v_key="wrapper",
                     )(),
                 )(
-                    partial, loop, v_key="map"
+                    ploop
                 )()
             )()
         )
@@ -466,23 +445,17 @@ class TestLoopFunc:
                 monad(
                     lambda address: address["zipcode"][:5],
                     compose(swap_val, maybe),
-                )(partial, loop, v_key="map")(
-                    pouterwrap, lambda x: x["addresses"], v_key="wrapper"
-                )(
+                )(ploop)(pouterwrap, lambda x: x["addresses"], v_key="wrapper")(
                     pinnerwrap, lambda x: {"address": x}, v_key="wrapper"
                 )(
                     merge,
-                    monad(lambda phone: phone[0], compose(swap_val, maybe))(
-                        partial, loop, v_key="map"
-                    )(
+                    monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
                         pouterwrap,
                         lambda x: x["phones"],
                         v_key="wrapper",
-                    )(
-                        pinnerwrap, lambda x: {"phone": x}, v_key="wrapper"
-                    )(),
+                    )(pinnerwrap, lambda x: {"phone": x}, v_key="wrapper")(),
                 )(
-                    partial, loop, v_key="map"
+                    ploop
                 )()
             )()
         )
@@ -547,17 +520,17 @@ class TestMem:
             == monad(test_data, compose(mem, debug, swap_val, maybe))
                 (__post="data")
                 (__mount=lambda address: address["zipcode"][:5])
-                (partial, loop, v_key="map")
+                (ploop)
                 (pouterwrap, lambda x: x["addresses"],v_key="wrapper")
                 (pinnerwrap, lambda x: {"address": x}, v_key="wrapper")
                 (__post="user_func")
                 (__mount=lambda phone: phone[0])
-                (partial, loop, v_key="map")
+                (ploop)
                 (pouterwrap, lambda x: x["phones"],v_key="wrapper")
                 (pinnerwrap, lambda x: {"phone": x}, v_key="wrapper")
                 (pmerge)
                 (__get="user_func", __call=True)
-                (partial, loop, v_key="map")
+                (ploop)
                 (__get="data", __call=True)
                 ()
         )

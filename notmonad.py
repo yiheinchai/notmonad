@@ -220,6 +220,7 @@ def swap_val(value, func, *args, **kwargs):
     return value, func, args[1:], {**kwargs, v_key: val_temp}
 
 
+# DEPRECATED
 def swap_val_auto(v_key):
     @caller
     def _swap_val(value, func, *args, **kwargs):
@@ -233,6 +234,7 @@ def swap_val_auto(v_key):
     return _swap_val
 
 
+# DEPRECATED
 def swap_val_auto_optional(v_key_auto):
     @caller
     def _swap_val(value, func, *args, **kwargs):
@@ -310,9 +312,9 @@ def loop(data, map=lambda x: x, filter=lambda x: True):
     return [map(i) for i in data if filter(i)]
 
 
-def ploop(*args, **kwargs):
+def ploop(value, *args, **kwargs):
     """Partial loop (cloop) to allow for chaining of nested loops together"""
-    return partial(loop, *args, **kwargs)
+    return partial(loop, *args, map=value, **kwargs)
 
 
 def innerwrap(func, value, wrapper):
