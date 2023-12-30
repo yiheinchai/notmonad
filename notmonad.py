@@ -312,7 +312,7 @@ def loop(data, map=lambda x: x, filter=lambda x: True):
     return [map(i) for i in data if filter(i)]
 
 
-def ploop(value, *args, **kwargs):
+def p_loop(value, *args, **kwargs):
     """Partial loop (cloop) to allow for chaining of nested loops together"""
     return partial(loop, *args, map=value, **kwargs)
 
@@ -353,12 +353,5 @@ def merge(value, value2):
     return inner
 
 
-def pmerge(*args):
+def p_merge(*args):
     return partial(merge, *args)
-
-
-def ppmerge(value, func):
-    def inner(value2, data):
-        return {**value(data), **value2(data)}
-
-    return [inner, monad(func, compose(debug, swap_val, maybe))]

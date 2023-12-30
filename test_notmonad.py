@@ -186,9 +186,9 @@ class TestLoopFunc:
             Maybe,
         )(
             loop,
-            map=monad(lambda x: x + 1, compose(swap_val, just))(ploop)(ploop)(ploop)(
-                ploop
-            )(ploop)(),
+            map=monad(lambda x: x + 1, compose(swap_val, just))(p_loop)(p_loop)(p_loop)(
+                p_loop
+            )(p_loop)(),
         )() == [[[[[[2, 3, 4]]]]]]
 
     def test_cloop_4_layer_nesting_with_flat_syntax(self):
@@ -197,9 +197,9 @@ class TestLoopFunc:
             Maybe,
         )(
             loop,
-            map=monad(lambda x: x + 1, compose(swap_val, maybe))(ploop)(ploop)(ploop)(
-                ploop
-            )(ploop)(),
+            map=monad(lambda x: x + 1, compose(swap_val, maybe))(p_loop)(p_loop)(
+                p_loop
+            )(p_loop)(p_loop)(),
         )() == [[[[[[2, 3, 4]]]]]]
 
     def test_cloop_with_lambda_modifications(self):
@@ -208,7 +208,7 @@ class TestLoopFunc:
             Maybe,
         )(
             loop,
-            map=monad(lambda x: x + 1, compose(swap_val, just))(ploop)(
+            map=monad(lambda x: x + 1, compose(swap_val, just))(p_loop)(
                 wrap,
                 lambda x: {"cluster": x},
             )(),
@@ -220,8 +220,8 @@ class TestLoopFunc:
 
         # fmt: off
         assert monad(test_data,Maybe)(monad(lambda x: x + 1, compose(swap_val, maybe))(
-            ploop)(wrap, lambda x: {"cluster": x}, 
-            )(ploop)(ploop)(ploop)(ploop)(ploop)(ploop)())() == test_answer
+            p_loop)(wrap, lambda x: {"cluster": x}, 
+            )(p_loop)(p_loop)(p_loop)(p_loop)(p_loop)(p_loop)())() == test_answer
         # fmt: on
 
         # VS
@@ -298,13 +298,13 @@ class TestLoopFunc:
                         monad(
                             lambda address: address["zipcode"][:5],
                             compose(swap_val, maybe),
-                        )(ploop)(peel, lambda x: x["addresses"],)()(user),
-                        monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
+                        )(p_loop)(peel, lambda x: x["addresses"],)()(user),
+                        monad(lambda phone: phone[0], compose(swap_val, maybe))(p_loop)(
                             peel, lambda x: x["phones"]
                         )()(user),
                     ],
                     compose(swap_val, maybe),
-                )(ploop)()
+                )(p_loop)()
             )()
         )
 
@@ -364,14 +364,14 @@ class TestLoopFunc:
                 monad(
                     lambda address: address["zipcode"][:5],
                     compose(swap_val, maybe),
-                )(ploop)(peel, lambda x: x["addresses"])(
+                )(p_loop)(peel, lambda x: x["addresses"])(
                     join,
-                    monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
+                    monad(lambda phone: phone[0], compose(swap_val, maybe))(p_loop)(
                         peel,
                         lambda x: x["phones"],
                     )(),
                 )(
-                    ploop
+                    p_loop
                 )()
             )()
         )
@@ -435,7 +435,7 @@ class TestLoopFunc:
                 monad(
                     lambda address: address["zipcode"][:5],
                     compose(swap_val, maybe),
-                )(ploop)(
+                )(p_loop)(
                     peel,
                     lambda x: x["addresses"],
                 )(
@@ -443,7 +443,7 @@ class TestLoopFunc:
                     lambda x: {"address": x},
                 )(
                     merge,
-                    monad(lambda phone: phone[0], compose(swap_val, maybe))(ploop)(
+                    monad(lambda phone: phone[0], compose(swap_val, maybe))(p_loop)(
                         peel,
                         lambda x: x["phones"],
                     )(
@@ -451,7 +451,7 @@ class TestLoopFunc:
                         lambda x: {"phone": x},
                     )(),
                 )(
-                    ploop
+                    p_loop
                 )()
             )()
         )
@@ -516,17 +516,17 @@ class TestMem:
             == monad(test_data, compose(mem, debug, swap_val, maybe))
                 (__post="data")
                 (__mount=lambda address: address["zipcode"][:5])
-                (ploop)
+                (p_loop)
                 (peel,  lambda x: x["addresses"])
                 (wrap, lambda x: {"address": x})
                 (__post="user_func")
                 (__mount=lambda phone: phone[0])
-                (ploop)
+                (p_loop)
                 (peel,  lambda x: x["phones"])
                 (wrap, lambda x: {"phone": x})
-                (pmerge)
+                (p_merge)
                 (__get="user_func", __call=True)
-                (ploop)
+                (p_loop)
                 (__get="data", __call=True)
                 ()
         )
