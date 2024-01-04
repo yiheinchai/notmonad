@@ -69,6 +69,9 @@ class TestJustMonad:
         with pytest.raises(ZeroDivisionError):
             monad(5, Just)(add, 1)(lambda x: x / 0)(lambda x: x + 2)(add, 3)()
 
+    def test_able_to_call_with_none_value(self):
+        assert monad(None, Just)(lambda: 5)() == 5
+
 
 class TestMaybeMonad:
     def test_construction_direct(self):
@@ -78,10 +81,15 @@ class TestMaybeMonad:
         assert monad(5, compose(maybe))() == 5
 
     def test_able_to_not_error(self):
-        assert (
-            monad(5, compose(maybe))(add, 1)(lambda x: x / 0)(lambda x: x + 2)(add, 3)()
-            is None
+        assert isinstance(
+            monad(5, compose(maybe))(add, 1)(lambda x: x / 0)(lambda x: x + 2)(
+                add, 3
+            )(),
+            ZeroDivisionError,
         )
+
+    def test_able_to_call_with_none_value(self):
+        assert monad(None, Maybe)(lambda: 5)() == 5
 
 
 class TestLogMonad:
@@ -94,11 +102,18 @@ class TestLogMonad:
 
 class TestDebugMonad:
     def test_return_none_on_error(self):
-        assert (
-            monad(5, compose(debug, maybe))(add, 1)(lambda x: x / 0)(add, 3)() is None
+        assert isinstance(
+            monad(5, compose(debug, maybe))(add, 1)(lambda x: x / 0)(add, 3)(),
+            ZeroDivisionError,
         )
 
     def test_able_to_get_debug_trace(self):
+        print(
+            monad(5, compose(debug, maybe))(add, 1)(lambda x: x / 0)(add, 3).keywords[
+                "_debug_trace"
+            ]
+        )
+
         assert monad(5, compose(debug, maybe))(add, 1)(lambda x: x / 0)(
             add, 3
         ).keywords["_debug_trace"] == [

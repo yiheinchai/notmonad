@@ -102,25 +102,30 @@ def monad(value, monad_func):
 
 @caller
 def just(value, func, *args, **kwargs):
+    if value is None and func is not None:
+        return func(*args, **kwargs), func, args, kwargs
     return func(value, *args, **kwargs), func, args, kwargs
 
 
 @caller
 def maybe(value, func=None, *args, **kwargs):
-    if value is None:
-        return None, func, (), {}
+    if isinstance(value, Exception):
+        return value, func, (), {}
 
     try:
-        result = func(value, *args, **kwargs)
+        if value is None and func is not None:
+            result = func(*args, **kwargs)
+        else:
+            result = func(value, *args, **kwargs)
     except Exception as e:
-        result = None
+        result = e
 
     return result, func, args, kwargs
 
 
 def debug(value, func, *args, **kwargs):
-    if value is None:
-        return None, func, args, kwargs
+    if isinstance(value, Exception):
+        return value, func, args, kwargs
 
     debug_trace = kwargs.pop("_debug_trace", [])
 
