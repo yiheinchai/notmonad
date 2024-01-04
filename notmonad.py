@@ -129,10 +129,12 @@ def debug(value, func, *args, **kwargs):
 
     debug_trace = kwargs.pop("_debug_trace", [])
 
+    pkwargs = {key: value for key, value in kwargs.items() if not key.startswith("_")}
+
     errors = ""
 
     try:
-        result = func(value, *args, **kwargs)
+        result = func(value, *args, **pkwargs)
     except Exception as e:
         errors = e
         result = None
@@ -146,7 +148,7 @@ def debug(value, func, *args, **kwargs):
         "repr": f"{getattr(func, '__name__', '')}{(value, *args)} -> {result} [{repr(errors)}]",
     }
 
-    print("\n\n ======== \n", new_trace["repr"])
+    print("\n======== \n", new_trace["repr"])
 
     return value, func, args, {**kwargs, "_debug_trace": [*debug_trace, new_trace]}
 
@@ -266,13 +268,18 @@ def mem(value, func, *args, **kwargs):
     should_call = kwargs.get("__call", False)
     data_to_mount = kwargs.get("__mount", None)
 
+    should_retain = kwargs.get("__retain", False)
+
     kwargs_mem: dict = kwargs.get("_mem", {})
 
     if post_key is not None:
         newMem = {**kwargs_mem, post_key: value}
 
         if get_key is None:
-            newValue = None
+            if should_retain:
+                newValue = value
+            else:
+                newValue = None
 
         if data_to_mount is not None:
             newValue = data_to_mount
@@ -281,7 +288,10 @@ def mem(value, func, *args, **kwargs):
 
     if get_key is not None:
         # throw old value away. need to store in mem before to not lose it
-        newValue = kwargs_mem.pop(get_key, None)
+        if should_retain:
+            newValue = kwargs_mem.get(get_key, None)
+        else:
+            newValue = kwargs_mem.pop(get_key, None)
 
         if should_call:
             # TODO: DO NOT CALL, return a partial to be called instead
@@ -360,3 +370,24 @@ def merge(value, value2):
 
 def p_merge(*args):
     return partial(merge, *args)
+
+
+def while_loop(value, func, cond=True, break_cond=lambda x: False):
+    if not cond:
+        return value
+
+    new_val = func(value)
+
+    if break_cond(new_val):
+        return new_val
+
+    return while_loop(new_val, func, cond, break_cond)
+
+
+def while_(value, func):
+    new_val, should_break = func(value)
+
+    if should_break:
+        return new_val
+
+    return while_loop(new_val, func)
