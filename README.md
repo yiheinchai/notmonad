@@ -73,6 +73,12 @@ A **bank** in the same style — users send funds to each other with a note on e
 python examples/bank.py
 ```
 
+The same program as one physical line (imports included) is `examples/bank.mini.py`:
+
+```bash
+python examples/bank.mini.py
+```
+
 Open `http://127.0.0.1:8000`. Demo logins: `alice` / `alice`, `bob` / `bob`, `carol` / `carol`. New accounts start with $100.
 
 | Django layer | notmonad |
@@ -261,6 +267,7 @@ from notmonad import App, chain
 ```bash
 python -m examples.site
 python examples/bank.py
+python examples/bank.mini.py
 python -c "from examples.oneline import app; from notmonad.web import serve; serve(app)"
 python examples/tic_tac_toe.py
 python examples/todo.py

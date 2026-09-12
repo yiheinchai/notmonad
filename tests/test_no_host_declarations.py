@@ -51,6 +51,31 @@ def test_bank_is_one_assignment_without_def_or_class():
         ), "bank demo must inline everything — no def or class"
 
 
+def test_bank_mini_is_one_line_with_imports():
+    path = Path(__file__).resolve().parents[1] / "examples" / "bank.mini.py"
+    source = path.read_text(encoding="utf-8")
+    lines = source.splitlines()
+    assert len(lines) == 1, "examples/bank.mini.py should be exactly one line"
+    line = lines[0]
+    assert line.startswith("import sys;"), line[:80]
+    assert "from notmonad import" in line
+    assert "app, reset_db, seed =" in line.replace(" ", "") or (
+        "app,reset_db,seed=" in line.replace(" ", "")
+    )
+    tree = ast.parse(source, filename=str(path))
+    assigns = [node for node in tree.body if isinstance(node, ast.Assign)]
+    assert len(assigns) == 1
+    assert [name.id for name in assigns[0].targets[0].elts] == [
+        "app",
+        "reset_db",
+        "seed",
+    ]
+    for node in ast.walk(tree):
+        assert not isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        ), "bank.mini.py must stay declaration-free"
+
+
 def test_web_combinators_are_chain_pipelines():
     path = Path(__file__).resolve().parents[1] / "notmonad" / "web.py"
     source = path.read_text(encoding="utf-8")
@@ -115,7 +140,7 @@ def test_imported_helpers_are_chain_lambdas():
 
 def test_oneline_and_bank_do_not_import_web():
     root = Path(__file__).resolve().parents[1] / "examples"
-    for name in ("oneline.py", "bank.py"):
+    for name in ("oneline.py", "bank.py", "bank.mini.py"):
         source = (root / name).read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(root / name))
         for node in ast.walk(tree):
