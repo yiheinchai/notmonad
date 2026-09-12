@@ -65,7 +65,7 @@ python -m examples.site
 
 Login `admin` / `admin`. Tests fail the build if `examples/site/*.py` contains a `def` or `class`.
 
-The same site as **one expression** (every helper inlined into memory slots) lives in `examples/oneline.py`.
+The same site as **one expression** lives in `examples/oneline.py`: store, HTML, router, views, and middleware are memory slots in a single `chain(..., App)`. It does not import `notmonad.web`.
 
 A **bank** in the same style — users send funds to each other with a note on every transfer:
 
@@ -84,6 +84,8 @@ Open `http://127.0.0.1:8000`. Demo logins: `alice` / `alice`, `bob` / `bob`, `ca
 | templates | `examples/site/templates.py` (hiccup lists) |
 | auth | `examples/site/auth.py` |
 | `wsgi.py` | `notmonad.web` |
+
+`examples/site/` still uses `notmonad.web` as a library. The one-assignment demos construct that layer themselves.
 
 Middleware is the same composition: `chain(handler, App)(wrap_params)(wrap_session)(wrap_exception)()`. Memory slots are the locals: `__post` / `__get` / `__call` make a handler a procedure instead of nested lambdas. Templates stay hiccup lists — data, not control flow.
 

@@ -1,13 +1,15 @@
 """The whole NotMonad Press site as one chain(..., App) expression.
 
 Helpers are memory slots (procedural locals). Nothing is declared and then
-referred to by name: store, queries, views, middleware, and routes are
-stashed with __post and applied with __get / __call.
+referred to by name: store, HTTP, queries, views, middleware, and routes are
+stashed with __post and applied with __get / __call. HTTP helpers are not
+imported: html, router, and responses are built in this same expression.
 """
 
 from notmonad import (
     App,
     Maybe,
+    Seq,
     assoc,
     assoc_in,
     atom,
@@ -20,10 +22,11 @@ from notmonad import (
     inc,
     recover,
     swap,
+    switch,
     tap,
     when,
+    while_loop,
 )
-from notmonad.web import GET, POST, html_response, redirect, response, router
 
 app, reset_db, seed = chain(
     atom(
@@ -36,6 +39,271 @@ app, reset_db, seed = chain(
     ),
     App,
 )(__post="store", __retain=True)(
+    lambda _store: (
+        lambda box: (
+            lambda esc: (
+                box.reset(
+                    lambda node: switch(
+                        node,
+                        (
+                            (lambda t: t is None or t is False, ""),
+                            (
+                                lambda t: isinstance(t, (str, int, float)),
+                                lambda t: esc(t),
+                            ),
+                            (
+                                lambda t: isinstance(t, (list, tuple))
+                                and bool(t)
+                                and isinstance(t[0], str),
+                                lambda n: chain(n, Seq)(
+                                    __post="n", __retain=True
+                                )(lambda tree: tree[0])(__post="tag")(
+                                    __get="n", __retain=True
+                                )(
+                                    lambda tree: tree[1]
+                                    if len(tree) > 1
+                                    and isinstance(tree[1], dict)
+                                    else {}
+                                )(__post="attrs")(__get="n")(
+                                    lambda tree: tree[2:]
+                                    if len(tree) > 1
+                                    and isinstance(tree[1], dict)
+                                    else tree[1:]
+                                )(
+                                    lambda children: "".join(
+                                        deref(box)(child)
+                                        for child in children
+                                    )
+                                )(__post="inner")(__get="attrs")(
+                                    lambda attrs: "".join(
+                                        f' {key}="{esc(val, True)}"'
+                                        for key, val in attrs.items()
+                                        if val is not None
+                                        and val is not False
+                                    )
+                                )(__post="attr_s")(
+                                    __get="tag", __retain=True
+                                )(
+                                    lambda tag: lambda attr_s: lambda inner: (
+                                        f"<{tag}{attr_s}>"
+                                        if tag
+                                        in {
+                                            "br",
+                                            "hr",
+                                            "img",
+                                            "input",
+                                            "meta",
+                                            "link",
+                                        }
+                                        else f"<{tag}{attr_s}>{inner}</{tag}>"
+                                    )
+                                )(__get="attr_s", __call=True)(
+                                    __get="inner", __call=True
+                                )()
+                            ),
+                            (
+                                lambda t: isinstance(t, (list, tuple)),
+                                lambda t: "".join(
+                                    deref(box)(child) for child in t
+                                ),
+                            ),
+                        ),
+                        lambda t: esc(t),
+                    )
+                ),
+                {
+                    "html": deref(box),
+                    "response": lambda status, body="", headers=None: chain(
+                        status, Seq
+                    )(
+                        lambda code: {
+                            "status": int(code),
+                            "body": body,
+                            "headers": dict(headers or {}),
+                        }
+                    )(),
+                    "html_response": lambda node, status=200, headers=None: chain(
+                        deref(box)(node), Seq
+                    )(
+                        lambda body: {
+                            "status": int(status),
+                            "body": body,
+                            "headers": dmerge(
+                                {
+                                    "Content-Type": "text/html; charset=utf-8"
+                                },
+                                dict(headers or {}),
+                            ),
+                        }
+                    )(),
+                    "redirect": lambda url, status=302, headers=None: chain(
+                        dict(headers or {}), Seq
+                    )(assoc, "Location", url)(
+                        lambda hdrs: {
+                            "status": int(status),
+                            "body": "",
+                            "headers": hdrs,
+                        }
+                    )(),
+                    "GET": lambda path, handler: {
+                        "method": "get",
+                        "path": path,
+                        "handler": handler,
+                    },
+                    "POST": lambda path, handler: {
+                        "method": "post",
+                        "path": path,
+                        "handler": handler,
+                    },
+                    "router": lambda routes, not_found=None: lambda request: chain(
+                        {
+                            "routes": list(routes),
+                            "request": request,
+                            "matched": None,
+                        },
+                        Seq,
+                    )(
+                        while_loop,
+                        lambda state: chain(state["routes"][0], Seq)(
+                            __post="item", __retain=True
+                        )(
+                            lambda item: (
+                                lambda pattern, uri: chain(
+                                    {
+                                        "p": [
+                                            part
+                                            for part in pattern.split("/")
+                                            if part != ""
+                                        ],
+                                        "u": [
+                                            part
+                                            for part in uri.split("?")[0].split(
+                                                "/"
+                                            )
+                                            if part != ""
+                                        ],
+                                        "params": {},
+                                        "ok": True,
+                                    },
+                                    Seq,
+                                )(
+                                    if_else,
+                                    lambda s: len(s["p"]) != len(s["u"]),
+                                    lambda s: {
+                                        **s,
+                                        "ok": False,
+                                        "p": [],
+                                        "u": [],
+                                    },
+                                    lambda s: s,
+                                )(
+                                    while_loop,
+                                    lambda s: chain(s, Seq)(
+                                        __post="st", __retain=True
+                                    )(lambda x: x["p"][0])(__post="pat")(
+                                        __get="st", __retain=True
+                                    )(lambda x: x["u"][0])(__post="got")(
+                                        __get="st"
+                                    )(
+                                        lambda item: lambda pat: lambda got: (
+                                            {
+                                                **item,
+                                                "p": item["p"][1:],
+                                                "u": item["u"][1:],
+                                                "params": {
+                                                    **item["params"],
+                                                    pat[1:]: got,
+                                                },
+                                            }
+                                            if pat.startswith(":")
+                                            else {
+                                                **item,
+                                                "p": item["p"][1:],
+                                                "u": item["u"][1:],
+                                            }
+                                            if pat == got
+                                            else {
+                                                **item,
+                                                "p": [],
+                                                "u": [],
+                                                "ok": False,
+                                            }
+                                        )
+                                    )(__get="pat", __call=True)(
+                                        __get="got", __call=True
+                                    )(),
+                                    cond=lambda s: s["ok"] and bool(s["p"]),
+                                )(
+                                    if_else,
+                                    lambda s: s["ok"],
+                                    lambda s: s["params"],
+                                    lambda _: None,
+                                )()
+                            )(
+                                str(item["path"]),
+                                str(state["request"].get("uri") or "/"),
+                            )
+                        )(__post="params")(__get="item")(
+                            lambda item: lambda params: {
+                                **state,
+                                "routes": state["routes"][1:],
+                                "matched": {
+                                    "handler": item["handler"],
+                                    "params": params,
+                                }
+                                if params is not None
+                                and str(item.get("method") or "get").lower()
+                                in (
+                                    str(
+                                        state["request"].get("request-method")
+                                        or "get"
+                                    ).lower(),
+                                    "any",
+                                )
+                                else None,
+                            }
+                        )(__get="params", __call=True)(),
+                        cond=lambda state: state["matched"] is None
+                        and bool(state["routes"]),
+                    )(
+                        if_else,
+                        lambda state: state["matched"] is not None,
+                        lambda state: state["matched"]["handler"](
+                            {
+                                **state["request"],
+                                "params": {
+                                    **(state["request"].get("params") or {}),
+                                    **state["matched"]["params"],
+                                },
+                                "route-params": state["matched"]["params"],
+                            }
+                        ),
+                        lambda _: not_found(request)
+                        if not_found is not None
+                        else {
+                            "status": 404,
+                            "body": "Not found",
+                            "headers": {},
+                        },
+                    )(),
+                },
+            )[1]
+        )(
+            lambda text, quote=False: (
+                str(text)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                if quote
+                else str(text)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+        )
+    )(atom(None))
+)(__post="web")(__get="store", __retain=True)(
     lambda store: (
         lambda table: chain(deref(store), App)(get_in, ["ids", table], 0)(
             inc
@@ -209,10 +477,10 @@ app, reset_db, seed = chain(
     )
 )(__get="insert", __retain=True, __call=True)(__post="seed", __retain=True)(
     tap, lambda fn: fn()
-)(__get="insert", __retain=True)(
-    lambda insert: lambda all_rows: lambda fetch: lambda current_user: lambda login: lambda is_admin: lambda layout: lambda post_form: lambda login_form: router(
+)(__get="web", __retain=True)(
+    lambda web: lambda insert: lambda all_rows: lambda fetch: lambda current_user: lambda login: lambda is_admin: lambda layout: lambda post_form: lambda login_form: web["router"](
         [
-            GET(
+            web["GET"](
                 "/",
                 lambda request: chain("posts", App)(all_rows)(
                     lambda posts: [
@@ -237,15 +505,15 @@ app, reset_db, seed = chain(
                             for post in posts
                         ],
                     ]
-                )(lambda body: layout("Home", body))(html_response)(),
+                )(lambda body: layout("Home", body))(web["html_response"])(),
             ),
-            GET(
+            web["GET"](
                 "/posts/new",
                 lambda request: chain(post_form(), App)(
                     lambda form: layout("New post", form)
-                )(html_response)(),
+                )(web["html_response"])(),
             ),
-            POST(
+            web["POST"](
                 "/posts/new",
                 lambda request: chain(request, App)(
                     __post="req", __retain=True
@@ -271,8 +539,8 @@ app, reset_db, seed = chain(
                 )(__get="row", __call=True)(__get="status")(
                     if_else,
                     lambda status: status == 302,
-                    lambda _: redirect("/"),
-                    lambda _: html_response(
+                    lambda _: web["redirect"]("/"),
+                    lambda _: web["html_response"](
                         layout(
                             "New post",
                             [
@@ -285,7 +553,7 @@ app, reset_db, seed = chain(
                     ),
                 )(),
             ),
-            GET(
+            web["GET"](
                 "/posts/:id",
                 lambda request: chain(request, App)(
                     get_in, ["params", "id"], ""
@@ -311,17 +579,17 @@ app, reset_db, seed = chain(
                     "Not found",
                 )(lambda title: lambda body: layout(title, body))(
                     __get="body", __call=True
-                )(lambda node: lambda status: html_response(node, status))(
+                )(lambda node: lambda status: web["html_response"](node, status))(
                     __get="status", __call=True
                 )(),
             ),
-            GET(
+            web["GET"](
                 "/login",
                 lambda request: chain(login_form(), App)(
                     lambda form: layout("Login", form)
-                )(html_response)(),
+                )(web["html_response"])(),
             ),
-            POST(
+            web["POST"](
                 "/login",
                 lambda request: chain(request, App)(get, "form", {})(
                     lambda form: login(
@@ -333,13 +601,13 @@ app, reset_db, seed = chain(
                 )(__post="status")(__get="sess")(
                     if_else,
                     lambda sess: sess.get("id"),
-                    lambda sess: lambda _: redirect(
+                    lambda sess: lambda _: web["redirect"](
                         "/",
                         headers={
                             "Set-Cookie": f"sid={sess['id']}; Path=/"
                         },
                     ),
-                    lambda _: lambda status: html_response(
+                    lambda _: lambda status: web["html_response"](
                         layout(
                             "Login",
                             [
@@ -352,7 +620,7 @@ app, reset_db, seed = chain(
                     ),
                 )(__get="status", __call=True)(),
             ),
-            GET(
+            web["GET"](
                 "/admin",
                 lambda request: chain(request, App)(is_admin)(
                     if_else, bool, 200, 403
@@ -384,10 +652,10 @@ app, reset_db, seed = chain(
                 )(
                     if_else,
                     lambda status: status == 200,
-                    lambda _: lambda panel: html_response(
+                    lambda _: lambda panel: web["html_response"](
                         layout("Admin", panel)
                     ),
-                    lambda _: lambda panel: html_response(
+                    lambda _: lambda panel: web["html_response"](
                         layout(
                             "Forbidden",
                             [
@@ -402,9 +670,9 @@ app, reset_db, seed = chain(
         ],
         not_found=lambda request: chain(
             ["p", "404 — nothing here."], App
-        )(lambda body: layout("Not found", body))(html_response, 404)(),
+        )(lambda body: layout("Not found", body))(web["html_response"], 404)(),
     )
-)(__get="all_rows", __call=True)(__get="fetch", __retain=True, __call=True)(
+)(__get="insert", __call=True)(__get="all_rows", __call=True)(__get="fetch", __retain=True, __call=True)(
     __get="current_user", __call=True
 )(__get="login", __call=True)(__get="is_admin", __call=True)(
     __get="layout", __call=True
@@ -427,11 +695,11 @@ app, reset_db, seed = chain(
 )(__get="fetch", __call=True)(__get="handler", __call=True)(
     lambda handler: lambda request: chain(chain(request, Maybe)(handler)())(
         recover,
-        lambda err: response(
-            500,
-            f"Internal error: {err}",
-            {"Content-Type": "text/plain"},
-        ),
+        lambda err: {
+            "status": 500,
+            "body": f"Internal error: {err}",
+            "headers": {"Content-Type": "text/plain"},
+        },
     )()
 )(__post="app")(__get="store", __retain=True)(
     lambda store: (

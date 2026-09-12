@@ -3,6 +3,7 @@
 from notmonad import (
     App,
     Maybe,
+    Seq,
     assoc,
     assoc_in,
     atom,
@@ -15,10 +16,11 @@ from notmonad import (
     inc,
     recover,
     swap,
+    switch,
     tap,
     when,
+    while_loop,
 )
-from notmonad.web import GET, POST, html_response, redirect, response, router, serve
 
 app, reset_db, seed = chain(
     atom(
@@ -31,6 +33,271 @@ app, reset_db, seed = chain(
     ),
     App,
 )(__post="store", __retain=True)(
+    lambda _store: (
+        lambda box: (
+            lambda esc: (
+                box.reset(
+                    lambda node: switch(
+                        node,
+                        (
+                            (lambda t: t is None or t is False, ""),
+                            (
+                                lambda t: isinstance(t, (str, int, float)),
+                                lambda t: esc(t),
+                            ),
+                            (
+                                lambda t: isinstance(t, (list, tuple))
+                                and bool(t)
+                                and isinstance(t[0], str),
+                                lambda n: chain(n, Seq)(
+                                    __post="n", __retain=True
+                                )(lambda tree: tree[0])(__post="tag")(
+                                    __get="n", __retain=True
+                                )(
+                                    lambda tree: tree[1]
+                                    if len(tree) > 1
+                                    and isinstance(tree[1], dict)
+                                    else {}
+                                )(__post="attrs")(__get="n")(
+                                    lambda tree: tree[2:]
+                                    if len(tree) > 1
+                                    and isinstance(tree[1], dict)
+                                    else tree[1:]
+                                )(
+                                    lambda children: "".join(
+                                        deref(box)(child)
+                                        for child in children
+                                    )
+                                )(__post="inner")(__get="attrs")(
+                                    lambda attrs: "".join(
+                                        f' {key}="{esc(val, True)}"'
+                                        for key, val in attrs.items()
+                                        if val is not None
+                                        and val is not False
+                                    )
+                                )(__post="attr_s")(
+                                    __get="tag", __retain=True
+                                )(
+                                    lambda tag: lambda attr_s: lambda inner: (
+                                        f"<{tag}{attr_s}>"
+                                        if tag
+                                        in {
+                                            "br",
+                                            "hr",
+                                            "img",
+                                            "input",
+                                            "meta",
+                                            "link",
+                                        }
+                                        else f"<{tag}{attr_s}>{inner}</{tag}>"
+                                    )
+                                )(__get="attr_s", __call=True)(
+                                    __get="inner", __call=True
+                                )()
+                            ),
+                            (
+                                lambda t: isinstance(t, (list, tuple)),
+                                lambda t: "".join(
+                                    deref(box)(child) for child in t
+                                ),
+                            ),
+                        ),
+                        lambda t: esc(t),
+                    )
+                ),
+                {
+                    "html": deref(box),
+                    "response": lambda status, body="", headers=None: chain(
+                        status, Seq
+                    )(
+                        lambda code: {
+                            "status": int(code),
+                            "body": body,
+                            "headers": dict(headers or {}),
+                        }
+                    )(),
+                    "html_response": lambda node, status=200, headers=None: chain(
+                        deref(box)(node), Seq
+                    )(
+                        lambda body: {
+                            "status": int(status),
+                            "body": body,
+                            "headers": dmerge(
+                                {
+                                    "Content-Type": "text/html; charset=utf-8"
+                                },
+                                dict(headers or {}),
+                            ),
+                        }
+                    )(),
+                    "redirect": lambda url, status=302, headers=None: chain(
+                        dict(headers or {}), Seq
+                    )(assoc, "Location", url)(
+                        lambda hdrs: {
+                            "status": int(status),
+                            "body": "",
+                            "headers": hdrs,
+                        }
+                    )(),
+                    "GET": lambda path, handler: {
+                        "method": "get",
+                        "path": path,
+                        "handler": handler,
+                    },
+                    "POST": lambda path, handler: {
+                        "method": "post",
+                        "path": path,
+                        "handler": handler,
+                    },
+                    "router": lambda routes, not_found=None: lambda request: chain(
+                        {
+                            "routes": list(routes),
+                            "request": request,
+                            "matched": None,
+                        },
+                        Seq,
+                    )(
+                        while_loop,
+                        lambda state: chain(state["routes"][0], Seq)(
+                            __post="item", __retain=True
+                        )(
+                            lambda item: (
+                                lambda pattern, uri: chain(
+                                    {
+                                        "p": [
+                                            part
+                                            for part in pattern.split("/")
+                                            if part != ""
+                                        ],
+                                        "u": [
+                                            part
+                                            for part in uri.split("?")[0].split(
+                                                "/"
+                                            )
+                                            if part != ""
+                                        ],
+                                        "params": {},
+                                        "ok": True,
+                                    },
+                                    Seq,
+                                )(
+                                    if_else,
+                                    lambda s: len(s["p"]) != len(s["u"]),
+                                    lambda s: {
+                                        **s,
+                                        "ok": False,
+                                        "p": [],
+                                        "u": [],
+                                    },
+                                    lambda s: s,
+                                )(
+                                    while_loop,
+                                    lambda s: chain(s, Seq)(
+                                        __post="st", __retain=True
+                                    )(lambda x: x["p"][0])(__post="pat")(
+                                        __get="st", __retain=True
+                                    )(lambda x: x["u"][0])(__post="got")(
+                                        __get="st"
+                                    )(
+                                        lambda item: lambda pat: lambda got: (
+                                            {
+                                                **item,
+                                                "p": item["p"][1:],
+                                                "u": item["u"][1:],
+                                                "params": {
+                                                    **item["params"],
+                                                    pat[1:]: got,
+                                                },
+                                            }
+                                            if pat.startswith(":")
+                                            else {
+                                                **item,
+                                                "p": item["p"][1:],
+                                                "u": item["u"][1:],
+                                            }
+                                            if pat == got
+                                            else {
+                                                **item,
+                                                "p": [],
+                                                "u": [],
+                                                "ok": False,
+                                            }
+                                        )
+                                    )(__get="pat", __call=True)(
+                                        __get="got", __call=True
+                                    )(),
+                                    cond=lambda s: s["ok"] and bool(s["p"]),
+                                )(
+                                    if_else,
+                                    lambda s: s["ok"],
+                                    lambda s: s["params"],
+                                    lambda _: None,
+                                )()
+                            )(
+                                str(item["path"]),
+                                str(state["request"].get("uri") or "/"),
+                            )
+                        )(__post="params")(__get="item")(
+                            lambda item: lambda params: {
+                                **state,
+                                "routes": state["routes"][1:],
+                                "matched": {
+                                    "handler": item["handler"],
+                                    "params": params,
+                                }
+                                if params is not None
+                                and str(item.get("method") or "get").lower()
+                                in (
+                                    str(
+                                        state["request"].get("request-method")
+                                        or "get"
+                                    ).lower(),
+                                    "any",
+                                )
+                                else None,
+                            }
+                        )(__get="params", __call=True)(),
+                        cond=lambda state: state["matched"] is None
+                        and bool(state["routes"]),
+                    )(
+                        if_else,
+                        lambda state: state["matched"] is not None,
+                        lambda state: state["matched"]["handler"](
+                            {
+                                **state["request"],
+                                "params": {
+                                    **(state["request"].get("params") or {}),
+                                    **state["matched"]["params"],
+                                },
+                                "route-params": state["matched"]["params"],
+                            }
+                        ),
+                        lambda _: not_found(request)
+                        if not_found is not None
+                        else {
+                            "status": 404,
+                            "body": "Not found",
+                            "headers": {},
+                        },
+                    )(),
+                },
+            )[1]
+        )(
+            lambda text, quote=False: (
+                str(text)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                if quote
+                else str(text)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+        )
+    )(atom(None))
+)(__post="web")(__get="store", __retain=True)(
     lambda store: (
         lambda table: chain(deref(store), App)(get_in, ["ids", table], 0)(
             inc
@@ -282,20 +549,20 @@ app, reset_db, seed = chain(
         )
     )
 )(__get="all_rows", __retain=True, __call=True)(__post="board")(
-    __get="insert", __retain=True
+    __get="web", __retain=True
 )(
-    lambda insert: lambda current_user: lambda login: lambda find_user: lambda save: lambda board: lambda layout: router(
+    lambda web: lambda insert: lambda current_user: lambda login: lambda find_user: lambda save: lambda board: lambda layout: web["router"](
         [
-            GET(
+            web["GET"](
                 "/",
                 lambda request: chain(request, App)(current_user)(
                     if_else,
                     lambda user: user.get("id"),
-                    lambda user: html_response(board(user)),
-                    lambda _: redirect("/login"),
+                    lambda user: web["html_response"](board(user)),
+                    lambda _: web["redirect"]("/login"),
                 )(),
             ),
-            GET(
+            web["GET"](
                 "/login",
                 lambda request: chain(
                     [
@@ -325,9 +592,9 @@ app, reset_db, seed = chain(
                         ["button", {"type": "submit"}, "Log in"],
                     ],
                     App,
-                )(lambda form: layout("Login", form))(html_response)(),
+                )(lambda form: layout("Login", form))(web["html_response"])(),
             ),
-            POST(
+            web["POST"](
                 "/login",
                 lambda request: chain(request, App)(get, "form", {})(
                     lambda form: login(
@@ -339,13 +606,13 @@ app, reset_db, seed = chain(
                 )(__post="status")(__get="sess")(
                     if_else,
                     lambda sess: sess.get("id"),
-                    lambda sess: lambda _: redirect(
+                    lambda sess: lambda _: web["redirect"](
                         "/",
                         headers={
                             "Set-Cookie": f"sid={sess['id']}; Path=/"
                         },
                     ),
-                    lambda _: lambda status: html_response(
+                    lambda _: lambda status: web["html_response"](
                         layout(
                             "Login",
                             [
@@ -386,7 +653,7 @@ app, reset_db, seed = chain(
                     ),
                 )(__get="status", __call=True)(),
             ),
-            GET(
+            web["GET"](
                 "/register",
                 lambda request: chain(
                     [
@@ -421,10 +688,10 @@ app, reset_db, seed = chain(
                     ],
                     App,
                 )(lambda form: layout("Open account", form))(
-                    html_response
+                    web["html_response"]
                 )(),
             ),
-            POST(
+            web["POST"](
                 "/register",
                 lambda request: chain(request, App)(get, "form", {})(
                     __post="form", __retain=True
@@ -469,13 +736,13 @@ app, reset_db, seed = chain(
                 )(__post="sess")(__get="error", __retain=True)(
                     if_else,
                     lambda err: err == "",
-                    lambda _: lambda sess: redirect(
+                    lambda _: lambda sess: web["redirect"](
                         "/",
                         headers={
                             "Set-Cookie": f"sid={sess['id']}; Path=/"
                         },
                     ),
-                    lambda err: lambda sess: html_response(
+                    lambda err: lambda sess: web["html_response"](
                         layout(
                             "Open account",
                             [
@@ -519,14 +786,14 @@ app, reset_db, seed = chain(
                     ),
                 )(__get="sess", __call=True)(),
             ),
-            GET(
+            web["GET"](
                 "/logout",
-                lambda request: redirect(
+                lambda request: web["redirect"](
                     "/login",
                     headers={"Set-Cookie": "sid=; Path=/; Max-Age=0"},
                 ),
             ),
-            POST(
+            web["POST"](
                 "/send",
                 lambda request: chain(request, App)(
                     __post="req", __retain=True
@@ -596,20 +863,20 @@ app, reset_db, seed = chain(
                 )(
                     if_else,
                     lambda err: err == "",
-                    lambda _: lambda sender: redirect("/"),
+                    lambda _: lambda sender: web["redirect"]("/"),
                     lambda err: lambda sender: (
-                        redirect("/login")
+                        web["redirect"]("/login")
                         if not sender.get("id")
-                        else html_response(board(sender, err), 400)
+                        else web["html_response"](board(sender, err), 400)
                     ),
                 )(__get="sender", __call=True)(),
             ),
         ],
         not_found=lambda request: chain(
             ["p", "404 — nothing here."], App
-        )(lambda body: layout("Not found", body))(html_response, 404)(),
+        )(lambda body: layout("Not found", body))(web["html_response"], 404)(),
     )
-)(__get="current_user", __call=True)(__get="login", __call=True)(
+)(__get="insert", __call=True)(__get="current_user", __call=True)(__get="login", __call=True)(
     __get="find_user", __call=True
 )(__get="save", __call=True)(__get="board", __call=True)(
     __get="layout", __call=True
@@ -632,11 +899,11 @@ app, reset_db, seed = chain(
 )(__get="fetch", __call=True)(__get="handler", __call=True)(
     lambda handler: lambda request: chain(chain(request, Maybe)(handler)())(
         recover,
-        lambda err: response(
-            500,
-            f"Internal error: {err}",
-            {"Content-Type": "text/plain"},
-        ),
+        lambda err: {
+            "status": 500,
+            "body": f"Internal error: {err}",
+            "headers": {"Content-Type": "text/plain"},
+        },
     )()
 )(__post="app")(__get="store", __retain=True)(
     lambda store: (
@@ -653,4 +920,116 @@ app, reset_db, seed = chain(
     lambda app: lambda seed: lambda reset_db: (app, reset_db, seed)
 )(__get="seed", __call=True)(__get="reset", __call=True)()
 
-chain(app, App)(serve)() if __name__ == "__main__" else None
+(lambda serve: (setattr(app, "serve", lambda: serve(app)), app.serve() if __name__ == "__main__" else None)[-1])(
+    lambda handler, port=8000, host="127.0.0.1": chain((host, int(port), handler), Seq)(
+        lambda spec: __import__(
+            "wsgiref.simple_server", fromlist=["make_server"]
+        ).make_server(
+            spec[0],
+            spec[1],
+            lambda environ, start_response: chain(environ, Seq)(
+                lambda env: {
+                    "request-method": (env.get("REQUEST_METHOD") or "GET").lower(),
+                    "uri": env.get("PATH_INFO") or "/",
+                    "params": {
+                        key: (vals[0] if len(vals) == 1 else vals)
+                        for key, vals in __import__(
+                            "urllib.parse", fromlist=["parse_qs"]
+                        )
+                        .parse_qs(env.get("QUERY_STRING") or "", keep_blank_values=True)
+                        .items()
+                    },
+                    "headers": {
+                        **{
+                            key[5:].lower().replace("_", "-"): value
+                            for key, value in env.items()
+                            if key.startswith("HTTP_")
+                        },
+                        **(
+                            {"content-type": env["CONTENT_TYPE"]}
+                            if "CONTENT_TYPE" in env
+                            else {}
+                        ),
+                    },
+                    "form": (
+                        lambda raw, headers: {
+                            key: (vals[0] if len(vals) == 1 else vals)
+                            for key, vals in __import__(
+                                "urllib.parse", fromlist=["parse_qs"]
+                            )
+                            .parse_qs(
+                                raw.decode("utf-8", errors="replace"),
+                                keep_blank_values=True,
+                            )
+                            .items()
+                        }
+                        if raw
+                        and "application/x-www-form-urlencoded"
+                        in (headers.get("content-type") or "")
+                        else {}
+                    )(
+                        env["wsgi.input"].read(int(env.get("CONTENT_LENGTH") or 0))
+                        if int(env.get("CONTENT_LENGTH") or 0)
+                        else b"",
+                        {
+                            **{
+                                key[5:].lower().replace("_", "-"): value
+                                for key, value in env.items()
+                                if key.startswith("HTTP_")
+                            },
+                            **(
+                                {"content-type": env["CONTENT_TYPE"]}
+                                if "CONTENT_TYPE" in env
+                                else {}
+                            ),
+                        },
+                    ),
+                    "body": "",
+                }
+            )(handler)(
+                lambda result=None: result
+                if isinstance(result, dict) and "status" in result
+                else {"status": 200, "body": result, "headers": {}}
+            )(
+                lambda resp: (
+                    lambda body: (
+                        lambda headers: (
+                            start_response(
+                                f"{int(resp.get('status') or 200)} "
+                                + {
+                                    200: "OK",
+                                    302: "Found",
+                                    400: "Bad Request",
+                                    401: "Unauthorized",
+                                    403: "Forbidden",
+                                    404: "Not Found",
+                                    500: "Internal Server Error",
+                                }.get(int(resp.get("status") or 200), "OK"),
+                                headers,
+                            ),
+                            [body],
+                        )[1]
+                    )(
+                        list((resp.get("headers") or {}).items())
+                        + (
+                            []
+                            if any(
+                                str(key).lower() == "content-type"
+                                for key, _ in (resp.get("headers") or {}).items()
+                            )
+                            else [("Content-Type", "text/html; charset=utf-8")]
+                        )
+                        + [("Content-Length", str(len(body)))]
+                    )
+                )(
+                    resp.get("body")
+                    if isinstance(resp.get("body"), bytes)
+                    else str(resp.get("body") or "").encode("utf-8")
+                )
+            )()
+        )
+    )(
+        tap,
+        lambda httpd: print(f"notmonad serving on http://{host}:{port}"),
+    )(lambda httpd: httpd.serve_forever())()
+)

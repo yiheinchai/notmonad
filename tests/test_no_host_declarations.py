@@ -113,6 +113,22 @@ def test_imported_helpers_are_chain_lambdas():
         assert "chain(" in text
 
 
+def test_oneline_and_bank_do_not_import_web():
+    root = Path(__file__).resolve().parents[1] / "examples"
+    for name in ("oneline.py", "bank.py"):
+        source = (root / name).read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(root / name))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert not node.module.startswith("notmonad.web"), (
+                    f"{name} should inline HTTP helpers in the chain, "
+                    "not import notmonad.web"
+                )
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert not alias.name.startswith("notmonad.web")
+
+
 def test_site_app_modules_are_chain_pipelines():
     skip = {"templates.py", "__init__.py"}
     files = [path for path in SITE.glob("*.py") if path.name not in skip]
