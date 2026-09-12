@@ -65,6 +65,12 @@ python -m examples.site
 
 Login `admin` / `admin`. Tests fail the build if `examples/site/*.py` contains a `def` or `class`.
 
+The same site as **one expression** (every helper inlined into memory slots) lives in `examples/oneline.py`:
+
+```bash
+python -c "from examples.oneline import app; from notmonad.web import serve; serve(app)"
+```
+
 | Django layer | notmonad |
 | --- | --- |
 | `models.py` | `examples/site/db.py` (atom + queries) |
@@ -239,6 +245,7 @@ from notmonad import App, chain
 
 ```bash
 python -m examples.site
+python -c "from examples.oneline import app; from notmonad.web import serve; serve(app)"
 python examples/tic_tac_toe.py
 python examples/todo.py
 ```
