@@ -24,7 +24,7 @@ show = lambda request: (
         lambda pid: fetch("posts", pid)
     )(__post="post", __retain=True)(
         if_else, lambda post: post.get("id"), lambda _: 200, lambda _: 404
-    )(__post="status")(__get="post")(
+    )(__post="status")(__get="post", __retain=True)(
         if_else,
         lambda post: post.get("id"),
         post_detail,

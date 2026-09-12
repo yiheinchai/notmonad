@@ -1,29 +1,16 @@
 from examples.site.auth import parse_cookies
 from examples.site.db import fetch
-from notmonad import (
-    App,
-    Maybe,
-    assoc,
-    chain,
-    dmerge,
-    get,
-    get_in,
-    identity,
-    if_else,
-    is_error,
-)
+from notmonad import App, Maybe, assoc, chain, dmerge, get, get_in, recover
 from notmonad.web import response
 
 wrap_exception = lambda handler: lambda request: (
-    chain(request, Maybe)(handler)(
-        if_else,
-        is_error,
+    chain(chain(request, Maybe)(handler)())(
+        recover,
         lambda err: response(
             500,
             f"Internal error: {err}",
             {"Content-Type": "text/plain"},
         ),
-        identity,
     )()
 )
 
