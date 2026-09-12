@@ -65,11 +65,15 @@ python -m examples.site
 
 Login `admin` / `admin`. Tests fail the build if `examples/site/*.py` contains a `def` or `class`.
 
-The same site as **one expression** (every helper inlined into memory slots) lives in `examples/oneline.py`:
+The same site as **one expression** (every helper inlined into memory slots) lives in `examples/oneline.py`.
+
+A **bank** in the same style — users send funds to each other with a note on every transfer:
 
 ```bash
-python -c "from examples.oneline import app; from notmonad.web import serve; serve(app)"
+python examples/bank.py
 ```
+
+Open `http://127.0.0.1:8000`. Demo logins: `alice` / `alice`, `bob` / `bob`, `carol` / `carol`. New accounts start with $100.
 
 | Django layer | notmonad |
 | --- | --- |
@@ -245,6 +249,7 @@ from notmonad import App, chain
 
 ```bash
 python -m examples.site
+python examples/bank.py
 python -c "from examples.oneline import app; from notmonad.web import serve; serve(app)"
 python examples/tic_tac_toe.py
 python examples/todo.py
