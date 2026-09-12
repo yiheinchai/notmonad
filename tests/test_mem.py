@@ -64,3 +64,10 @@ class TestMem:
 
     def test_mount_none(self):
         assert chain(5, App)(__mount=None)() is None
+
+    def test_mem_is_procedural_locals(self):
+        assert (
+            chain(2, App)(__post="x")(__mount=3)(__post="y")(
+                __mount=lambda a: lambda b: a + b
+            )(__get="x", __call=True)(__get="y", __call=True)()
+        ) == 5

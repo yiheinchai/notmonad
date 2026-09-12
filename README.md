@@ -75,7 +75,7 @@ Login `admin` / `admin`. Tests fail the build if `examples/site/*.py` contains a
 | auth | `examples/site/auth.py` |
 | `wsgi.py` | `notmonad.web` |
 
-Middleware is the same composition: `chain(handler, App)(wrap_params)(wrap_session)(wrap_exception)()`. Memory slots (`__post` / `__get` / `__call`) thread request state the way tic-tac-toe threads a board. Templates stay hiccup lists — data, not control flow.
+Middleware is the same composition: `chain(handler, App)(wrap_params)(wrap_session)(wrap_exception)()`. Memory slots are the locals: `__post` / `__get` / `__call` make a handler a procedure instead of nested lambdas. Templates stay hiccup lists — data, not control flow.
 
 ## Building an app
 
@@ -130,7 +130,7 @@ monad(5, compose(debug, maybe))(lambda x: x + 1)(lambda x: x / 0).trace
 
 ### Memory slots
 
-Fork a computation, stash it, do something else, then come back:
+The memory system is how a pipeline stays **procedural**. Named slots are locals: stash a value, do the next statement, come back. No nested `let` / `chain` / closures for intermediates.
 
 ```python
 from notmonad import App, chain
@@ -146,7 +146,21 @@ from notmonad import App, chain
 )
 ```
 
-`__call=True` applies the current value (a function) to a stored value — that is how nested maps stay flat.
+`__call=True` applies the current value (a function) to a stored slot — curried steps plus memory replace nested maps and nested pipelines:
+
+```python
+(
+    chain(request, App)
+    (__post="req", __retain=True)
+    (get_in, ["form", "title"], "")
+    (__post="title")
+    (__get="req")
+    (current_user)
+    (lambda user: lambda title: insert("posts", {"title": title, "author": user}))
+    (__get="title", __call=True)
+    ()
+)
+```
 
 ### Custom interceptors
 

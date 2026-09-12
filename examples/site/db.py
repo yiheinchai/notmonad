@@ -5,14 +5,13 @@ from notmonad import (
     atom,
     chain,
     deref,
-    effect,
     get,
     get_in,
     if_else,
     inc,
     swap,
     tap,
-    unless,
+    when,
 )
 
 store = atom(
@@ -42,7 +41,9 @@ next_id = lambda table: (
 )
 
 insert = lambda table, row: (
-    chain(table, App)(next_id)(lambda ident: assoc(row, "id", ident))(
+    chain(row, App)(__post="row")(__mount=table)(next_id)(
+        lambda ident: lambda saved: assoc(saved, "id", ident)
+    )(__get="row", __call=True)(
         tap, lambda saved: swap(store, assoc_in, [table, saved["id"]], saved)
     )()
 )
@@ -53,11 +54,8 @@ all_rows = lambda table: (
 
 fetch = lambda table, ident: (
     chain(ident if ident is not None else "", App)(
-        if_else,
-        bool,
-        lambda key: get_in(deref(store), [table, int(key)], {}),
-        lambda _: {},
-    )()
+        if_else, bool, lambda key: int(key), 0
+    )(lambda key: get_in(deref(store), [table, key], {}))()
 )
 
 find_user = lambda username: (
@@ -70,34 +68,36 @@ find_user = lambda username: (
 )
 
 seed = lambda: (
-    chain("users", App)(all_rows)(
-        unless,
+    chain("users", App)(all_rows)(lambda rows: not rows)(
+        __post="empty", __retain=True
+    )(
+        when,
         bool,
-        lambda _: (
-            chain(True, App)(
-                effect,
-                insert,
-                "users",
-                {"username": "admin", "password": "admin", "role": "admin"},
-            )(
-                effect,
-                insert,
-                "posts",
-                {
-                    "title": "Hello from notmonad",
-                    "body": "This site is a Python library: models, views, urls, middleware — no def or class.",
-                    "author": "admin",
-                },
-            )(
-                effect,
-                insert,
-                "posts",
-                {
-                    "title": "Pipelines all the way down",
-                    "body": "Request dicts flow through middleware and routes the same way data flows through chain.",
-                    "author": "admin",
-                },
-            )()
+        lambda _: insert(
+            "users",
+            {"username": "admin", "password": "admin", "role": "admin"},
+        ),
+    )(__get="empty", __retain=True)(
+        when,
+        bool,
+        lambda _: insert(
+            "posts",
+            {
+                "title": "Hello from notmonad",
+                "body": "This site is a Python library: models, views, urls, middleware — no def or class.",
+                "author": "admin",
+            },
+        ),
+    )(__get="empty")(
+        when,
+        bool,
+        lambda _: insert(
+            "posts",
+            {
+                "title": "Pipelines all the way down",
+                "body": "Request dicts flow through middleware and routes the same way data flows through chain.",
+                "author": "admin",
+            },
         ),
     )()
 )

@@ -1,4 +1,8 @@
-"""Site views as chain(..., App) pipelines — mem, if_else, nested chains."""
+"""Site views: one chain(..., App) per handler.
+
+Memory slots are the locals. A handler is a procedure: stash, compute,
+stash, combine with __call. Branches return values; they do not nest chain().
+"""
 
 from examples.site.auth import current_user, is_admin, login
 from examples.site.db import all_rows, fetch, insert
@@ -23,17 +27,17 @@ show = lambda request: (
     chain(request, App)(get_in, ["params", "id"], "")(
         lambda pid: fetch("posts", pid)
     )(__post="post", __retain=True)(
-        if_else, lambda post: post.get("id"), lambda _: 200, lambda _: 404
+        if_else, lambda post: post.get("id"), 200, 404
     )(__post="status")(__get="post", __retain=True)(
         if_else,
         lambda post: post.get("id"),
         post_detail,
-        lambda _: ["p", "No such post."],
+        ["p", "No such post."],
     )(__post="body")(__get="post")(
         if_else,
         lambda post: post.get("id"),
         lambda post: post["title"],
-        lambda _: "Not found",
+        "Not found",
     )(lambda title: lambda body: layout(title, body))(
         __get="body", __call=True
     )(lambda node: lambda status: html_response(node, status))(
@@ -48,23 +52,37 @@ new_post = lambda request: (
 )
 
 create_post = lambda request: (
-    chain(request, App)(get_in, ["form", "title"], "")(
+    chain(request, App)(__post="req", __retain=True)(
+        get_in, ["form", "title"], ""
+    )(__post="title")(__get="req", __retain=True)(
+        get_in, ["form", "body"], ""
+    )(__post="body")(__get="req")(current_user)(__post="user")(
+        __get="title", __retain=True
+    )(if_else, bool, 302, 400)(__post="status")(
+        __get="title", __retain=True
+    )(
+        lambda title: lambda body: lambda user: {
+            "title": title,
+            "body": body,
+            "author": user.get("username") or "anonymous",
+        }
+    )(__get="body", __call=True)(__get="user", __call=True)(__post="row")(
+        __get="status", __retain=True
+    )(
         if_else,
-        bool,
-        lambda title: (
-            chain(request, App)(current_user)(
-                lambda user: {
-                    "title": title,
-                    "body": get_in(request, ["form", "body"], ""),
-                    "author": user.get("username") or "anonymous",
-                }
-            )(lambda row: insert("posts", row))(lambda _: redirect("/"))()
-        ),
-        lambda _: (
-            chain(
+        lambda status: status == 302,
+        lambda _: lambda row: insert("posts", row),
+        lambda _: lambda row: row,
+    )(__get="row", __call=True)(__get="status")(
+        if_else,
+        lambda status: status == 302,
+        lambda _: redirect("/"),
+        lambda _: html_response(
+            layout(
+                "New post",
                 ["div", ["p", "Title is required."], post_form()],
-                App,
-            )(lambda body: layout("New post", body))(html_response, 400)()
+            ),
+            400,
         ),
     )()
 )
@@ -80,39 +98,43 @@ login_post = lambda request: (
         lambda form: login(
             form.get("username") or "", form.get("password") or ""
         )
-    )(
+    )(__post="sess", __retain=True)(
+        if_else, lambda sess: sess.get("id"), 302, 401
+    )(__post="status")(__get="sess")(
         if_else,
         lambda sess: sess.get("id"),
-        lambda sess: redirect(
+        lambda sess: lambda _: redirect(
             "/", headers={"Set-Cookie": f"sid={sess['id']}; Path=/"}
         ),
-        lambda _: (
-            chain(
+        lambda _: lambda status: html_response(
+            layout(
+                "Login",
                 ["div", ["p", "Invalid credentials."], login_form()],
-                App,
-            )(lambda body: layout("Login", body))(html_response, 401)()
+            ),
+            status,
         ),
-    )()
+    )(__get="status", __call=True)()
 )
 
 admin = lambda request: (
-    chain(request, App)(
+    chain(request, App)(is_admin)(if_else, bool, 200, 403)(__post="status")(
+        __mount="posts"
+    )(all_rows)(__post="posts")(__mount="users")(all_rows)(
+        lambda users: lambda posts: admin_panel(users, posts)
+    )(__get="posts", __call=True)(__post="panel")(
+        __get="status", __retain=True
+    )(
         if_else,
-        is_admin,
-        lambda _: (
-            chain("posts", App)(all_rows)(__post="posts")(__mount="users")(
-                all_rows
-            )(lambda users: lambda posts: admin_panel(users, posts))(
-                __get="posts", __call=True
-            )(lambda body: layout("Admin", body))(html_response)()
-        ),
-        lambda _: (
-            chain(
+        lambda status: status == 200,
+        lambda _: lambda panel: html_response(layout("Admin", panel)),
+        lambda _: lambda panel: html_response(
+            layout(
+                "Forbidden",
                 ["p", "Admins only. Sign in as admin/admin."],
-                App,
-            )(lambda body: layout("Forbidden", body))(html_response, 403)()
+            ),
+            403,
         ),
-    )()
+    )(__get="panel", __call=True)()
 )
 
 not_found = lambda request: (
