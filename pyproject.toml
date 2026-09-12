@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notmonad"
+version = "1.0.0"
+description = "Pipeline-style data transformation and application control flow."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+authors = [{ name = "Yi Hein Chai", email = "chaiyihein@gmail.com" }]
+keywords = ["pipeline", "monad", "functional", "chaining", "maybe"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "numpy>=1.20"]
+
+[project.urls]
+Homepage = "https://github.com/yiheinchai/notmonad"
+Repository = "https://github.com/yiheinchai/notmonad"
+
+[tool.setuptools.packages.find]
+include = ["notmonad*"]
+
+[tool.setuptools.package-data]
+notmonad = ["py.typed"]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "examples"]
+testpaths = ["tests"]
+addopts = "-q"
