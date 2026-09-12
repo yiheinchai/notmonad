@@ -1,5 +1,6 @@
 from examples.site import middleware, views
-from notmonad.web import GET, POST, router, wrap
+from notmonad import App, chain
+from notmonad.web import GET, POST, router
 
 handler = router(
     [
@@ -14,9 +15,8 @@ handler = router(
     not_found=views.not_found,
 )
 
-app = wrap(
-    handler,
-    middleware.wrap_params,
-    middleware.wrap_session,
-    middleware.wrap_exception,
+app = (
+    chain(handler, App)(middleware.wrap_params)(middleware.wrap_session)(
+        middleware.wrap_exception
+    )()
 )

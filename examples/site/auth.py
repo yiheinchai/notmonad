@@ -1,33 +1,31 @@
 from examples.site.db import fetch, find_user, insert
-from notmonad import cond, get_in, let
+from notmonad import App, chain, get, get_in, if_else
 
 parse_cookies = lambda header: (
-    {}
-    if not header
-    else dict(
-        (
-            lambda kv: (
-                kv[0].strip(),
-                kv[1].strip() if len(kv) > 1 else "",
-            )
-        )(part.split("=", 1))
-        for part in str(header).split(";")
-    )
+    chain(header or "", App)(
+        lambda h: [part.strip() for part in str(h).split(";") if part.strip()]
+    )(
+        lambda parts: [part.split("=", 1) for part in parts if "=" in part]
+    )(lambda pairs: dict((key.strip(), val.strip()) for key, val in pairs))()
 )
 
-current_user = lambda request: let(
-    ["uid", lambda: get_in(request, ["session", "user-id"])],
-    lambda uid: fetch("users", uid) if uid else None,
+current_user = lambda request: (
+    chain(request, App)(get_in, ["session", "user-id"], 0)(
+        if_else, bool, lambda uid: fetch("users", uid), lambda _: {}
+    )()
 )
 
-login = lambda username, password: let(
-    ["user", lambda: find_user(username)],
-    lambda user: cond(
-        (
-            user is not None and user.get("password") == password,
-            lambda: insert("sessions", {"user-id": user["id"]}),
-        )
-    ),
+login = lambda username, password: (
+    chain(username, App)(find_user)(
+        if_else,
+        lambda user: bool(user.get("id")) and user.get("password") == password,
+        lambda user: insert("sessions", {"user-id": user["id"]}),
+        lambda _: {},
+    )()
 )
 
-is_admin = lambda request: (current_user(request) or {}).get("role") == "admin"
+is_admin = lambda request: (
+    chain(request, App)(current_user)(get, "role", "")(
+        lambda role: role == "admin"
+    )()
+)

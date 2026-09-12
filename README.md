@@ -27,26 +27,33 @@ chain(np.array([[1, 2, 3], [1, 2, 3]]))(np.transpose)(np.sum, axis=1)(np.mean)(
 )()
 ```
 
-The same machinery — interceptors, memory, loops, branching, `let` / `do` / `thread`, atoms — is enough to write full programs **in ordinary `.py` files**. NotMonad is not a new language. Application code is Python that never needs `def` or `class`: lambdas, combinators, and pipelines. `examples/site/` is a Django-shaped web app (models, views, urls, middleware, templates, auth) written that way.
+The same machinery — interceptors, memory, loops, branching, atoms — is enough to write full programs **in ordinary `.py` files**. NotMonad is not a new language. The idea is monads for everything: `chain(value, App)(func, *args)(...)()`, with `mem`, `maybe`, `if_else` / `when` / `unless`. `examples/site/` is a Django-shaped web app (models, views, urls, middleware, templates, auth) written as those pipelines.
 
 > The word *monad* here is used loosely. These are composable interceptors around each pipeline step, not category-theory monads.
 
 ## No declarations
 
-Clojure-style *in Python*: `fn` / `let` / `do` / `thread` / `cond` / `atom` are library functions, not a reader or compiler. A view is a lambda:
+A view is a lambda that finishes a `chain(..., App)` pipeline — the same shape as tic-tac-toe, not a pile of `let` / `cond` helpers:
 
 ```python
-from notmonad import get_in, let, cond
+from notmonad import App, chain, get_in, if_else
 from notmonad.web import html_response
 
-index = lambda request: html_response(["html", ["body", ["h1", "Hello"]]])
+index = lambda request: (
+    chain("posts", App)(all_rows)(post_list)(
+        lambda body: layout("Home", body)
+    )(html_response)()
+)
 
-show = lambda request: let(
-    ["post", lambda: fetch("posts", get_in(request, ["params", "id"]))],
-    lambda post: cond(
-        (post, lambda: html_response(post_detail(post))),
-        else_=lambda: html_response(["p", "Not found"], 404),
-    ),
+show = lambda request: (
+    chain(request, App)(get_in, ["params", "id"], "")(
+        lambda pid: fetch("posts", pid)
+    )(
+        if_else,
+        lambda post: post.get("id"),
+        lambda post: html_response(layout(post["title"], post_detail(post))),
+        lambda _: html_response(layout("Not found", ["p", "No such post."]), 404),
+    )()
 )
 ```
 
@@ -68,7 +75,7 @@ Login `admin` / `admin`. Tests fail the build if `examples/site/*.py` contains a
 | auth | `examples/site/auth.py` |
 | `wsgi.py` | `notmonad.web` |
 
-`chain` / `App` still work for data pipelines (`examples/tic_tac_toe.py`, `examples/todo.py`).
+Middleware is the same composition: `chain(handler, App)(wrap_params)(wrap_session)(wrap_exception)()`. Memory slots (`__post` / `__get` / `__call`) thread request state the way tic-tac-toe threads a board. Templates stay hiccup lists — data, not control flow.
 
 ## Building an app
 

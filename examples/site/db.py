@@ -1,4 +1,19 @@
-from notmonad import assoc, assoc_in, atom, cond, deref, do, get_in, inc, let, swap
+from notmonad import (
+    App,
+    assoc,
+    assoc_in,
+    atom,
+    chain,
+    deref,
+    effect,
+    get,
+    get_in,
+    if_else,
+    inc,
+    swap,
+    tap,
+    unless,
+)
 
 store = atom(
     {
@@ -16,62 +31,73 @@ blank_state = lambda: {
     "ids": {"users": 0, "posts": 0, "sessions": 0},
 }
 
-reset_db = lambda: store.reset(blank_state())
-
-next_id = lambda table: let(
-    ["ident", lambda: inc(get_in(deref(store), ["ids", table], 0))],
-    lambda ident: do(
-        lambda: swap(store, lambda st: assoc_in(st, ["ids", table], ident)),
-        lambda: ident,
-    ),
+reset_db = lambda: (
+    chain(store, App)(lambda box: box.reset(blank_state()))()
 )
 
-insert = lambda table, row: let(
-    [
-        "ident",
-        lambda: next_id(table),
-        "saved",
-        lambda ident: assoc(row, "id", ident),
-    ],
-    lambda ident, saved: do(
-        lambda: swap(store, lambda st: assoc_in(st, [table, ident], saved)),
-        lambda: saved,
-    ),
+next_id = lambda table: (
+    chain(deref(store), App)(get_in, ["ids", table], 0)(inc)(
+        tap, lambda ident: swap(store, assoc_in, ["ids", table], ident)
+    )()
 )
 
-all_rows = lambda table: list((deref(store).get(table) or {}).values())
-
-fetch = lambda table, ident: get_in(deref(store), [table, int(ident)]) if ident is not None else None
-
-find_user = lambda username: next(
-    (user for user in all_rows("users") if user.get("username") == username),
-    None,
+insert = lambda table, row: (
+    chain(table, App)(next_id)(lambda ident: assoc(row, "id", ident))(
+        tap, lambda saved: swap(store, assoc_in, [table, saved["id"]], saved)
+    )()
 )
 
-seed = lambda: cond(
-    (
-        lambda: not all_rows("users"),
-        lambda: do(
-            lambda: insert(
+all_rows = lambda table: (
+    chain(deref(store), App)(get, table, {})(lambda rows: list(rows.values()))()
+)
+
+fetch = lambda table, ident: (
+    chain(ident if ident is not None else "", App)(
+        if_else,
+        bool,
+        lambda key: get_in(deref(store), [table, int(key)], {}),
+        lambda _: {},
+    )()
+)
+
+find_user = lambda username: (
+    chain("users", App)(all_rows)(
+        lambda users: next(
+            (user for user in users if user.get("username") == username),
+            {},
+        )
+    )()
+)
+
+seed = lambda: (
+    chain("users", App)(all_rows)(
+        unless,
+        bool,
+        lambda _: (
+            chain(True, App)(
+                effect,
+                insert,
                 "users",
                 {"username": "admin", "password": "admin", "role": "admin"},
-            ),
-            lambda: insert(
+            )(
+                effect,
+                insert,
                 "posts",
                 {
                     "title": "Hello from notmonad",
                     "body": "This site is a Python library: models, views, urls, middleware — no def or class.",
                     "author": "admin",
                 },
-            ),
-            lambda: insert(
+            )(
+                effect,
+                insert,
                 "posts",
                 {
                     "title": "Pipelines all the way down",
                     "body": "Request dicts flow through middleware and routes the same way data flows through chain.",
                     "author": "admin",
                 },
-            ),
+            )()
         ),
-    )
+    )()
 )
