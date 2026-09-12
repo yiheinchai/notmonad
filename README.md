@@ -239,11 +239,17 @@ Requires Python 3.9+.
 pip install git+https://github.com/yiheinchai/notmonad.git
 ```
 
-From a clone:
+From a clone, examples add the repo root to `sys.path`, so this works without installing:
 
 ```bash
 git clone https://github.com/yiheinchai/notmonad
 cd notmonad
+python examples/bank.py
+```
+
+For tests and `import notmonad` from other directories:
+
+```bash
 pip install -e ".[dev]"
 pytest
 ```

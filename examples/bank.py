@@ -1,5 +1,10 @@
 """NotMonad Bank — send and receive funds with a note, one chain(..., App)."""
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from notmonad import (
     App,
     Maybe,

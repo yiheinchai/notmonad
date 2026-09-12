@@ -11,7 +11,11 @@ steps so this file is also a reference for building other apps.
 from __future__ import annotations
 
 import random
+import sys
+from pathlib import Path
 from typing import Callable
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from notmonad import App, chain, effect, p_loop, tap, unless, while_loop
 

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from notmonad import App, chain, effect, get, set_in, switch, tap, while_loop
 
 

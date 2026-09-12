@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from examples.bank import app, reset_db, seed
 from notmonad.web import invoke
 
@@ -87,3 +89,14 @@ def test_open_account_starts_with_one_hundred():
     assert home["status"] == 200
     assert "$100" in home["body"]
     assert "Hello, dave" in home["body"]
+
+
+def test_bank_script_finds_notmonad_when_run_as_file():
+    """python examples/bank.py puts examples/ on sys.path, not the repo root."""
+    import runpy
+
+    path = Path(__file__).resolve().parents[1] / "examples" / "bank.py"
+    ns = runpy.run_path(str(path), run_name="bank_demo")
+    assert callable(ns["app"])
+    assert callable(ns["reset_db"])
+    assert callable(ns["seed"])

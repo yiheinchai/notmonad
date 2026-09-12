@@ -6,6 +6,11 @@ stashed with __post and applied with __get / __call. HTTP helpers are not
 imported: html, router, and responses are built in this same expression.
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from notmonad import (
     App,
     Maybe,
