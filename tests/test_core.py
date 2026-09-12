@@ -122,6 +122,15 @@ class TestDebugMonad:
 
 
 class TestMonadConstruction:
+    def test_seq_has_mem_and_raises(self):
+        import pytest
+
+        pipeline = chain(5, Seq)(__post="x", __retain=True)(add, 1)
+        assert pipeline() == 6
+        assert pipeline.mem == {"x": 5}
+        with pytest.raises(ZeroDivisionError):
+            chain(5, Seq)(lambda x: x / 0)()
+
     def test_construct_monads_directly(self):
         assert monad(5, Just)(add, 1)() == 6
 

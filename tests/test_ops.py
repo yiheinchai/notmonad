@@ -49,6 +49,8 @@ class TestControlFlow:
             )()
             == 2
         )
+        assert chain({})(if_else, lambda row: row.get("id"), 200, 404)() == 404
+        assert chain({"id": 1})(if_else, lambda row: row.get("id"), 200, 404)() == 200
 
     def test_foreach_and_flatten(self):
         assert chain([1, 2, 3])(foreach, lambda n: n * 2, lambda n: n > 1)() == [4, 6]

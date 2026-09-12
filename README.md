@@ -200,6 +200,7 @@ Robust = compose(retry)  # retry is the caller; do not also compose `just`
 | Call | Stack |
 | --- | --- |
 | `chain(value)` / `pipe(value)` | `Just` (raise on error) |
+| `chain(value, Seq)` | `mem` + `just` — procedures with memory slots that still raise |
 | `chain(value, App)` | `mem` + `maybe` — default for applications |
 | `chain(value, Maybe)` | railway error handling |
 | `chain(value, Trace)` | `mem` + `debug` + `maybe` |
@@ -225,6 +226,8 @@ Finish with `()` or `.result()`. `.expect()` unwraps and raises if `Maybe` captu
 - `(__strict=True)` — missing keys raise `MemKeyError`
 
 Kwargs convention: `foo=` is a function argument, `_foo=` is pipeline state, `__foo=` is a one-shot interceptor action.
+
+Imported helpers (`if_else`, `assoc`, `html_response`, `router`, …) are themselves `chain(..., Seq)` procedures, not `def`. The interceptor engine (`just`, `maybe`, `mem`, `while_loop`, `Atom`) stays ordinary Python.
 
 ## Installation
 

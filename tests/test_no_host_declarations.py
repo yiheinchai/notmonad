@@ -51,6 +51,68 @@ def test_bank_is_one_assignment_without_def_or_class():
         ), "bank demo must inline everything — no def or class"
 
 
+def test_web_combinators_are_chain_pipelines():
+    path = Path(__file__).resolve().parents[1] / "notmonad" / "web.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    for node in ast.walk(tree):
+        assert not isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        ), "notmonad.web must be combinators (lambda), not def/class"
+    assert "chain(" in source
+    assert "Seq" in source
+
+
+def test_imported_helpers_are_chain_lambdas():
+    root = Path(__file__).resolve().parents[1]
+    expected = {
+        root / "notmonad" / "ops.py": [
+            "identity",
+            "const",
+            "tap",
+            "effect",
+            "if_else",
+            "when",
+            "unless",
+            "recover",
+            "get",
+            "inc",
+        ],
+        root / "notmonad" / "data.py": [
+            "atom",
+            "deref",
+            "swap",
+            "assoc",
+            "assoc_in",
+            "get_in",
+            "dmerge",
+        ],
+        root / "notmonad" / "web.py": [
+            "html_response",
+            "redirect",
+            "response",
+            "router",
+            "GET",
+            "POST",
+        ],
+    }
+    for path, names in expected.items():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        found = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                target = node.targets[0]
+                if isinstance(target, ast.Name) and target.id in names:
+                    found[target.id] = node.value
+        for name in names:
+            assert name in found, f"{path.name} is missing {name}"
+            assert isinstance(found[name], ast.Lambda), (
+                f"{path.name}:{name} should be a lambda chain procedure, not def"
+            )
+        text = path.read_text(encoding="utf-8")
+        assert "chain(" in text
+
+
 def test_site_app_modules_are_chain_pipelines():
     skip = {"templates.py", "__init__.py"}
     files = [path for path in SITE.glob("*.py") if path.name not in skip]

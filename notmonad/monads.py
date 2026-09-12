@@ -271,13 +271,12 @@ def mem(value: Any, func: Any, *args: Any, **kwargs: Any):
 Just = compose(just)
 Maybe = compose(maybe)
 ForLoops = compose(debug, swap_val, maybe)
+Seq = compose(mem, just)
 App = compose(mem, maybe)
 Trace = compose(mem, debug, maybe)
 
 
-def chain(value: Any, monad_func=None) -> Any:
-    """Start a pipeline. Defaults to :data:`Just`; pass :data:`App` for apps."""
-    return monad(value, Just if monad_func is None else monad_func)
-
-
+chain = lambda value, monad_func=None: monad(
+    value, Just if monad_func is None else monad_func
+)
 pipe = chain

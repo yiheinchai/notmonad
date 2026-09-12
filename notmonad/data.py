@@ -1,8 +1,15 @@
-"""Immutable-ish data helpers and atoms — Clojure-style, still Python."""
+"""Immutable-ish data helpers and atoms — Clojure-style, still Python.
+
+``Atom`` is the mutable box (needs a class). Everything apps import is a
+``chain(..., Seq)`` procedure.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable
+
+from notmonad.monads import Seq, chain
+from notmonad.ops import attempt, get, if_else, unless, while_loop
 
 
 class Atom:
@@ -28,84 +35,214 @@ class Atom:
         return f"Atom({self.state!r})"
 
 
-def atom(state: Any = None) -> Atom:
-    return Atom(state)
+atom = lambda state=None: chain(Atom, Seq)(lambda cls: cls(state))()
 
+deref = lambda box: chain(box, Seq)(lambda item: item.deref())()
 
-def deref(box: Atom) -> Any:
-    return box.deref()
+reset = lambda box, value: chain(box, Seq)(lambda item: item.reset(value))()
 
+swap = lambda box, fn, *args: (
+    chain(box, Seq)(lambda item: item.swap(fn, *args))()
+)
 
-def reset(box: Atom, value: Any) -> Any:
-    return box.reset(value)
+assoc = lambda mapping, *kvs: (
+    chain(
+        {
+            "out": dict(mapping or {}),
+            "pairs": [(kvs[i], kvs[i + 1]) for i in range(0, len(kvs), 2)],
+        },
+        Seq,
+    )(
+        while_loop,
+        lambda state: {
+            "out": {
+                **state["out"],
+                state["pairs"][0][0]: state["pairs"][0][1],
+            },
+            "pairs": state["pairs"][1:],
+        },
+        cond=lambda state: bool(state["pairs"]),
+    )(get, "out")()
+)
 
+dissoc = lambda mapping, *keys: (
+    chain(
+        {
+            "items": list(dict(mapping or {}).items()),
+            "drop": set(keys),
+            "out": {},
+        },
+        Seq,
+    )(
+        while_loop,
+        lambda state: {
+            **state,
+            "items": state["items"][1:],
+            "out": state["out"]
+            if state["items"][0][0] in state["drop"]
+            else {
+                **state["out"],
+                state["items"][0][0]: state["items"][0][1],
+            },
+        },
+        cond=lambda state: bool(state["items"]),
+    )(get, "out")()
+)
 
-def swap(box: Atom, fn: Callable, *args: Any) -> Any:
-    return box.swap(fn, *args)
+_get_in_step = lambda state: (
+    chain(state, Seq)(
+        if_else,
+        lambda item: item["cur"] is None,
+        lambda item: {**item, "miss": True, "rest": []},
+        lambda item: chain(item, Seq)(
+            if_else,
+            lambda cur_state: callable(getattr(cur_state["cur"], "get", None)),
+            lambda cur_state: {
+                **cur_state,
+                "miss": True,
+                "rest": [],
+                "cur": cur_state["default"],
+            }
+            if cur_state["rest"][0] not in cur_state["cur"]
+            else {
+                **cur_state,
+                "cur": cur_state["cur"][cur_state["rest"][0]],
+                "rest": cur_state["rest"][1:],
+            },
+            lambda cur_state: attempt(
+                lambda: {
+                    **cur_state,
+                    "cur": cur_state["cur"][cur_state["rest"][0]],
+                    "rest": cur_state["rest"][1:],
+                },
+                lambda _: {
+                    **cur_state,
+                    "miss": True,
+                    "rest": [],
+                    "cur": cur_state["default"],
+                },
+            ),
+        )(),
+    )()
+)
 
+get_in = lambda mapping, path, default=None: (
+    chain(
+        {
+            "cur": mapping,
+            "rest": list(path),
+            "default": default,
+            "miss": False,
+        },
+        Seq,
+    )(
+        while_loop,
+        _get_in_step,
+        cond=lambda state: (not state["miss"]) and bool(state["rest"]),
+    )(
+        if_else,
+        lambda state: state["miss"],
+        lambda state: state["default"],
+        lambda state: state["cur"],
+    )()
+)
 
-def assoc(mapping: Mapping | None, *kvs: Any) -> dict:
-    out = dict(mapping or {})
-    for i in range(0, len(kvs), 2):
-        out[kvs[i]] = kvs[i + 1]
-    return out
+assoc_in = lambda mapping, path, value: (
+    chain(
+        {"mapping": mapping, "path": list(path), "value": value, "out": None},
+        Seq,
+    )(
+        if_else,
+        lambda state: not state["path"],
+        lambda state: {**state, "out": state["value"], "done": True},
+        lambda state: {**state, "done": False},
+    )(
+        unless,
+        lambda state: state["done"],
+        lambda state: {
+            **state,
+            "out": assoc(state["mapping"], state["path"][0], state["value"])
+            if len(state["path"]) == 1
+            else assoc(
+                state["mapping"],
+                state["path"][0],
+                assoc_in(
+                    (state["mapping"] or {}).get(state["path"][0])
+                    if isinstance(state["mapping"], dict)
+                    else None,
+                    state["path"][1:],
+                    state["value"],
+                ),
+            ),
+            "done": True,
+        },
+    )(get, "out")()
+)
 
+update = lambda mapping, key, fn, *args: (
+    chain(mapping, Seq)(
+        lambda item: None
+        if item is None
+        else item.get(key)
+        if hasattr(item, "get")
+        else None
+    )(lambda current: assoc(mapping, key, fn(current, *args)))()
+)
 
-def dissoc(mapping: Mapping | None, *keys: Any) -> dict:
-    out = dict(mapping or {})
-    for key in keys:
-        out.pop(key, None)
-    return out
+update_in = lambda mapping, path, fn, *args: (
+    chain(
+        {
+            "mapping": mapping,
+            "path": list(path),
+            "fn": fn,
+            "args": args,
+            "out": None,
+        },
+        Seq,
+    )(
+        if_else,
+        lambda state: not state["path"],
+        lambda state: {
+            **state,
+            "out": state["fn"](state["mapping"], *state["args"]),
+            "done": True,
+        },
+        lambda state: {**state, "done": False},
+    )(
+        unless,
+        lambda state: state["done"],
+        lambda state: {
+            **state,
+            "out": update(
+                state["mapping"], state["path"][0], state["fn"], *state["args"]
+            )
+            if len(state["path"]) == 1
+            else assoc(
+                state["mapping"],
+                state["path"][0],
+                update_in(
+                    (state["mapping"] or {}).get(state["path"][0])
+                    if isinstance(state["mapping"], dict)
+                    else None,
+                    state["path"][1:],
+                    state["fn"],
+                    *state["args"],
+                ),
+            ),
+            "done": True,
+        },
+    )(get, "out")()
+)
 
-
-def get_in(mapping: Any, path: Sequence, default: Any = None) -> Any:
-    cur = mapping
-    for key in path:
-        if cur is None:
-            return default
-        getter = getattr(cur, "get", None)
-        if callable(getter):
-            if key not in cur:
-                return default
-            cur = cur[key]
-            continue
-        try:
-            cur = cur[key]
-        except (KeyError, IndexError, TypeError):
-            return default
-    return cur
-
-
-def assoc_in(mapping: Mapping | None, path: Sequence, value: Any) -> dict:
-    path = list(path)
-    if not path:
-        return value
-    key = path[0]
-    if len(path) == 1:
-        return assoc(mapping, key, value)
-    nested = (mapping or {}).get(key) if isinstance(mapping, dict) else None
-    return assoc(mapping, key, assoc_in(nested, path[1:], value))
-
-
-def update(mapping: Mapping | None, key: Any, fn: Callable, *args: Any) -> dict:
-    current = None if mapping is None else mapping.get(key) if hasattr(mapping, "get") else None
-    return assoc(mapping, key, fn(current, *args))
-
-
-def update_in(mapping: Mapping | None, path: Sequence, fn: Callable, *args: Any) -> dict:
-    path = list(path)
-    if not path:
-        return fn(mapping, *args)
-    key = path[0]
-    if len(path) == 1:
-        return update(mapping, key, fn, *args)
-    nested = (mapping or {}).get(key) if isinstance(mapping, dict) else None
-    return assoc(mapping, key, update_in(nested, path[1:], fn, *args))
-
-
-def dmerge(*maps: Mapping | None) -> dict:
-    out: dict = {}
-    for mapping in maps:
-        if mapping:
-            out.update(mapping)
-    return out
+dmerge = lambda *maps: (
+    chain({"maps": list(maps), "out": {}}, Seq)(
+        while_loop,
+        lambda state: {
+            "maps": state["maps"][1:],
+            "out": {**state["out"], **state["maps"][0]}
+            if state["maps"][0]
+            else state["out"],
+        },
+        cond=lambda state: bool(state["maps"]),
+    )(get, "out")()
+)
