@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Callable, Iterable, Sequence
 
 from notmonad.core import partial
@@ -260,3 +261,113 @@ def set_in(value: Any, key: Any, item: Any) -> Any:
         out[key] = item
         return type(value)(out)
     raise TypeError(f"set_in expected dict, list, or tuple, got {type(value).__name__}")
+
+
+def fn(func: Callable) -> Callable:
+    """Mark a callable as a function value. Identity — lets app code avoid ``def``."""
+    return func
+
+
+def _call_with_env(func: Any, env: dict) -> Any:
+    if not callable(func):
+        return func
+    try:
+        sig = inspect.signature(func)
+    except (TypeError, ValueError):
+        return func()
+    params = list(sig.parameters.values())
+    if not params:
+        return func()
+    if any(param.kind == param.VAR_KEYWORD for param in params):
+        return func(**env)
+    args = []
+    kwargs = {}
+    for param in params:
+        if param.kind == param.VAR_POSITIONAL:
+            continue
+        if param.name in env:
+            if param.kind == param.KEYWORD_ONLY:
+                kwargs[param.name] = env[param.name]
+            else:
+                args.append(env[param.name])
+        elif param.default is inspect.Parameter.empty:
+            return func()
+    return func(*args, **kwargs)
+
+
+def let(bindings, body):
+    """Sequential locals without ``def``. Callables receive bindings so far.
+
+    ``let(["x", 1, "y", lambda x: x + 1], lambda x, y: x + y)`` → ``3``
+    """
+    env: dict = {}
+    items = list(bindings)
+    if len(items) % 2:
+        raise ValueError("let bindings must come in name/value pairs")
+    for i in range(0, len(items), 2):
+        env[items[i]] = _call_with_env(items[i + 1], env)
+    return _call_with_env(body, env)
+
+
+def do(*steps: Any) -> Any:
+    """Evaluate ``steps`` in order (calling thunks) and return the last result."""
+    result = None
+    for step in steps:
+        result = step() if callable(step) else step
+    return result
+
+
+def thread(value: Any, *steps: Any) -> Any:
+    """Clojure ``->``: each step is ``fn`` or ``(fn, *args)`` with value first."""
+    for step in steps:
+        if step is None:
+            continue
+        if callable(step):
+            value = step(value)
+        elif isinstance(step, (tuple, list)) and step:
+            func, *args = step
+            value = func(value, *args)
+        else:
+            raise TypeError(f"thread step must be callable or (fn, *args), got {step!r}")
+    return value
+
+
+def thread_last(value: Any, *steps: Any) -> Any:
+    """Clojure ``->>``: value is passed as the last argument."""
+    for step in steps:
+        if callable(step):
+            value = step(value)
+        elif isinstance(step, (tuple, list)) and step:
+            func, *args = step
+            value = func(*args, value)
+        else:
+            raise TypeError(f"thread_last step must be callable or (fn, *args), got {step!r}")
+    return value
+
+
+def cond(*clauses, else_=None):
+    """``cond((pred, then), ..., else_=...)``. Pred/then may be thunks."""
+    for clause in clauses:
+        pred, then = clause[0], clause[1]
+        ok = pred() if callable(pred) else pred
+        if ok:
+            return then() if callable(then) else then
+    if else_ is None:
+        return None
+    return else_() if callable(else_) else else_
+
+
+def attempt(thunk: Callable, catch: Callable) -> Any:
+    """``try`` without a ``try`` statement in application code."""
+    try:
+        return thunk()
+    except Exception as exc:
+        return catch(exc)
+
+
+def inc(value: Any) -> Any:
+    return value + 1
+
+
+def dec(value: Any) -> Any:
+    return value - 1

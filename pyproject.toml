@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "notmonad"
-version = "1.0.0"
-description = "Pipeline-style data transformation and application control flow."
+version = "2.0.0"
+description = "Pure functional Python library for pipelines and declaration-free apps."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 authors = [{ name = "Yi Hein Chai", email = "chaiyihein@gmail.com" }]
-keywords = ["pipeline", "monad", "functional", "chaining", "maybe"]
+keywords = ["pipeline", "monad", "functional", "combinators", "wsgi"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",

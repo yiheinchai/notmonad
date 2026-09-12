@@ -6,10 +6,11 @@
   <br>
 </h1>
 
-<h4 align="center">Pipeline-style data transformation — and enough control flow to build a real app</h4>
+<h4 align="center">A pure functional library in Python — write entire apps with no <code>def</code> or <code>class</code></h4>
 
 <p align="center">
-  <a href="#building-an-app">Building an app</a> •
+  <a href="#no-declarations">No declarations</a> •
+  <a href="#building-an-app">Pipelines</a> •
   <a href="#api">API</a> •
   <a href="#installation">Installation</a> •
   <a href="#license">License</a>
@@ -26,9 +27,48 @@ chain(np.array([[1, 2, 3], [1, 2, 3]]))(np.transpose)(np.sum, axis=1)(np.mean)(
 )()
 ```
 
-The same machinery — interceptors, memory slots, loops, and branching — is enough to write full programs. `examples/tic_tac_toe.py` and `examples/todo.py` are complete applications built this way.
+The same machinery — interceptors, memory, loops, branching, `let` / `do` / `thread`, atoms — is enough to write full programs **in ordinary `.py` files**. NotMonad is not a new language. Application code is Python that never needs `def` or `class`: lambdas, combinators, and pipelines. `examples/site/` is a Django-shaped web app (models, views, urls, middleware, templates, auth) written that way.
 
 > The word *monad* here is used loosely. These are composable interceptors around each pipeline step, not category-theory monads.
+
+## No declarations
+
+Clojure-style *in Python*: `fn` / `let` / `do` / `thread` / `cond` / `atom` are library functions, not a reader or compiler. A view is a lambda:
+
+```python
+from notmonad import get_in, let, cond
+from notmonad.web import html_response
+
+index = lambda request: html_response(["html", ["body", ["h1", "Hello"]]])
+
+show = lambda request: let(
+    ["post", lambda: fetch("posts", get_in(request, ["params", "id"]))],
+    lambda post: cond(
+        (post, lambda: html_response(post_detail(post))),
+        else_=lambda: html_response(["p", "Not found"], 404),
+    ),
+)
+```
+
+Run the site:
+
+```bash
+python -m examples.site
+```
+
+Login `admin` / `admin`. Tests fail the build if `examples/site/*.py` contains a `def` or `class`.
+
+| Django layer | notmonad |
+| --- | --- |
+| `models.py` | `examples/site/db.py` (atom + queries) |
+| `views.py` | `examples/site/views.py` |
+| `urls.py` | `examples/site/urls.py` |
+| middleware | `examples/site/middleware.py` |
+| templates | `examples/site/templates.py` (hiccup lists) |
+| auth | `examples/site/auth.py` |
+| `wsgi.py` | `notmonad.web` |
+
+`chain` / `App` still work for data pipelines (`examples/tic_tac_toe.py`, `examples/todo.py`).
 
 ## Building an app
 
@@ -176,9 +216,8 @@ pytest
 from notmonad import App, chain
 ```
 
-Run the example apps:
-
 ```bash
+python -m examples.site
 python examples/tic_tac_toe.py
 python examples/todo.py
 ```
