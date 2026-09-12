@@ -177,7 +177,7 @@ def mmonad(monad_to_add: Monad) -> Partial:
             return compose(*monad_list)
         return partial(accumulate, [*monad_list, next_monad])
 
-    return accumulate([monad_to_add])
+    return partial(accumulate, [monad_to_add])
 
 
 def monad(value: Any, monad_func: Callable[..., Any]) -> Partial:
